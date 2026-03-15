@@ -9,6 +9,7 @@ import com.google.gson.JsonObject;
 
 import net.minecraft.server.MinecraftServer;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Field;
@@ -237,7 +238,16 @@ public class HttpServerManager {
             }
             
             try {
-                String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                String requestBody;
+                try (java.io.InputStream is = exchange.getRequestBody()) {
+                    java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                    byte[] buffer = new byte[1024];
+                    int len;
+                    while ((len = is.read(buffer)) != -1) {
+                        baos.write(buffer, 0, len);
+                    }
+                    requestBody = new String(baos.toByteArray(), StandardCharsets.UTF_8);
+                }
                 JsonObject request = GSON.fromJson(requestBody, JsonObject.class);
                 
                 JsonObject response = new JsonObject();

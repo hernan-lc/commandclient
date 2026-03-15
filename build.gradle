@@ -40,17 +40,15 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.10.1'
 }
 
+// Configure Java toolchain
 java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
-    }
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
 }
 
 tasks.withType(JavaCompile).configureEach {
     it.options.encoding = 'UTF-8'
-    it.options.release = 21
+    it.options.release = 8
 }
 
 processResources {

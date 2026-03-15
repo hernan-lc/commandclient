@@ -17,7 +17,7 @@ public class CommandApiMod implements ModInitializer {
     
     private ApiConfig config;
     private HttpServerManager httpServerManager;
-    private MinecraftServer minecraftServer;
+    private static MinecraftServer minecraftServer;
     
     @Override
     public void onInitialize() {
@@ -28,37 +28,43 @@ public class CommandApiMod implements ModInitializer {
         // Initialize HTTP server manager
         httpServerManager = new HttpServerManager(config);
         
-        // Register server lifecycle callbacks to get the server instance
-        // This works for both single player and dedicated server
+        // Register server lifecycle callbacks
         registerServerCallbacks();
         
         System.out.println("Command API Mod initialized - " + MOD_ID);
     }
     
     private void registerServerCallbacks() {
-        // Listen for server starting to get the MinecraftServer instance
+        // For dedicated server and single player
+        // Use SERVER_STARTING event
         ServerLifecycleEvents.SERVER_STARTING.register(server -> {
-            System.out.println("[CommandAPI] Server starting, preparing HTTP server...");
-            this.minecraftServer = server;
+            System.out.println("[CommandAPI] Server starting, setting up...");
+            minecraftServer = server;
             httpServerManager.setMinecraftServer(server);
         });
         
-        // Start HTTP server when server is ready
+        // When server is fully started, start HTTP server
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
-            System.out.println("[CommandAPI] Server started, starting HTTP server...");
+            System.out.println("[CommandAPI] Server fully started!");
+            minecraftServer = server;
+            httpServerManager.setMinecraftServer(server);
             httpServerManager.start();
         });
         
-        // Stop HTTP server when server stops
+        // When server is stopping
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
-            System.out.println("[CommandAPI] Server stopping, stopping HTTP server...");
+            System.out.println("[CommandAPI] Server stopping...");
             httpServerManager.stop();
         });
     }
     
+    // Static method to get server (for fallback)
+    public static MinecraftServer getServer() {
+        return minecraftServer;
+    }
+    
     /**
      * Get the current MinecraftServer instance.
-     * Can be used by other mods or for debugging.
      */
     public MinecraftServer getMinecraftServer() {
         return minecraftServer;
@@ -66,7 +72,6 @@ public class CommandApiMod implements ModInitializer {
     
     /**
      * Get the HTTP server manager.
-     * Can be used to access API endpoints.
      */
     public HttpServerManager getHttpServerManager() {
         return httpServerManager;
