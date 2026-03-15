@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "commandapi",
+  "version": "${version}",
+  "name": "Command API",
+  "description": "REST API to execute Minecraft commands remotely",
+  "authors": [
+    "CommandAPI"
+  ],
+  "contact": {
+    "homepage": "https://example.com",
+    "sources": "https://github.com/example/commandapi"
+  },
+  "license": "MIT",
+  "icon": "assets/modid/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.commandapi.CommandApiMod"
+    ]
+  },
+  "mixins": [],
+  "depends": {
+    "fabricloader": ">=0.14.21",
+    "fabric": ">=0.83.1",
+    "minecraft": "1.19.4",
+    "java": ">=17"
+  },
+  "suggests": {
+    "another-mod": "*"
+  }
+}

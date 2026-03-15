@@ -1,0 +1,18 @@
+pluginManagement {
+    repositories {
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        maven {
+            name = 'Mojang'
+            url = 'https://libraries.minecraft.net/'
+        }
+        gradlePluginPortal()
+    }
+}
+
+plugins {
+    id 'fabric-loom' version '1.7.4' apply false
+    id 'io.github.juuxel.loom-vineflower' version '1.11.0' apply false
+}
