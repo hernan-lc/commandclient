@@ -6,38 +6,25 @@ import com.sun.net.httpserver.HttpExchange;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import net.minecraft.client.Minecraft;
 
-import net.minecraft.server.MinecraftServer;
-
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Executors;
 
 /**
- * Manages the HTTP server for the Command API.
+ * Manages the HTTP server for sending chat messages.
  */
 public class HttpServerManager {
     private static final Gson GSON = new Gson();
     
     private final ApiConfig config;
     private HttpServer server;
-    private MinecraftServer minecraftServer;
     
     public HttpServerManager(ApiConfig config) {
         this.config = config;
-    }
-    
-    public void setMinecraftServer(MinecraftServer server) {
-        this.minecraftServer = server;
-    }
-    
-    public MinecraftServer getMinecraftServer() {
-        return minecraftServer;
     }
     
     public void start() {
@@ -45,12 +32,13 @@ public class HttpServerManager {
             server = HttpServer.create(new InetSocketAddress(config.getPort()), 0);
             server.setExecutor(Executors.newCachedThreadPool());
             
-            server.createContext("/api/execute", new ExecuteCommandHandler());
+            server.createContext("/api/chat", new ChatHandler());
+            // Keep execute for backward compatibility but map it to chat
+            server.createContext("/api/execute", new ChatHandler());
             server.createContext("/api/status", new StatusHandler());
-            server.createContext("/api/stop", new StopHandler());
             
             server.start();
-            System.out.println("HTTP Server started on port " + config.getPort());
+            System.out.println("Chat API Server started on port " + config.getPort());
         } catch (IOException e) {
             System.err.println("Failed to start HTTP server: " + e.getMessage());
         }
@@ -61,8 +49,6 @@ public class HttpServerManager {
             server.stop(0);
         }
     }
-    
-    // ==================== Authentication ====================
     
     boolean authenticate(HttpExchange exchange) {
         if (!config.isAuthEnabled() || config.getToken().isEmpty()) {
@@ -77,8 +63,6 @@ public class HttpServerManager {
         
         return false;
     }
-    
-    // ==================== Response Helpers ====================
     
     void sendJson(HttpExchange exchange, int statusCode, Object response) throws IOException {
         exchange.getResponseHeaders().set("Content-Type", "application/json");
@@ -96,139 +80,35 @@ public class HttpServerManager {
         error.addProperty("status", statusCode);
         sendJson(exchange, statusCode, error);
     }
-    
-    // ==================== Helper Methods using Reflection ====================
-    
-    private Object getCommandManager() {
-        try {
-            // Try to get the commandManager field via reflection
-            Field field = MinecraftServer.class.getDeclaredField("commandManager");
-            field.setAccessible(true);
-            return field.get(minecraftServer);
-        } catch (Exception e) {
-            // Fallback: try the getter method
-            try {
-                Method method = MinecraftServer.class.getMethod("getCommandManager");
-                return method.invoke(minecraftServer);
-            } catch (Exception ex) {
-                System.err.println("Could not get command manager: " + ex.getMessage());
-                return null;
-            }
-        }
-    }
-    
-    private Object getCommandSource() {
-        try {
-            // Try to get the serverCommandSource field via reflection
-            Field field = MinecraftServer.class.getDeclaredField("serverCommandSource");
-            field.setAccessible(true);
-            return field.get(minecraftServer);
-        } catch (Exception e) {
-            // Fallback: try the getter method
-            try {
-                Method method = MinecraftServer.class.getMethod("getCommandSource");
-                return method.invoke(minecraftServer);
-            } catch (Exception ex) {
-                System.err.println("Could not get command source: " + ex.getMessage());
-                return null;
-            }
-        }
-    }
-    
-    private int getPlayerCount() {
-        try {
-            // Try getPlayerList().size() first (older mappings)
-            Method getPlayerList = MinecraftServer.class.getMethod("getPlayerList");
-            Object playerList = getPlayerList.invoke(minecraftServer);
-            
-            // Try size() method
-            try {
-                Method size = playerList.getClass().getMethod("size");
-                return (int) size.invoke(playerList);
-            } catch (NoSuchMethodException e) {
-                // Try getCurrentPlayerCount() (newer mappings)
-                try {
-                    Method getCurrentPlayerCount = playerList.getClass().getMethod("getCurrentPlayerCount");
-                    return (int) getCurrentPlayerCount.invoke(playerList);
-                } catch (NoSuchMethodException ex) {
-                    return 0;
-                }
-            }
-        } catch (Exception e) {
-            return 0;
-        }
-    }
-    
-    private int getMaxPlayers() {
-        try {
-            Method getPlayerList = MinecraftServer.class.getMethod("getPlayerList");
-            Object playerList = getPlayerList.invoke(minecraftServer);
-            
-            try {
-                Method getMaxPlayers = playerList.getClass().getMethod("getMaxPlayers");
-                return (int) getMaxPlayers.invoke(playerList);
-            } catch (NoSuchMethodException e) {
-                // Try getMaxPlayerCount()
-                try {
-                    Method getMaxPlayerCount = playerList.getClass().getMethod("getMaxPlayerCount");
-                    return (int) getMaxPlayerCount.invoke(playerList);
-                } catch (NoSuchMethodException ex) {
-                    return 0;
-                }
-            }
-        } catch (Exception e) {
-            return 0;
-        }
-    }
-    
-    // ==================== Command Execution ====================
-    
-    private JsonObject executeCommand(String command) {
+
+    private JsonObject sendChatMessage(String message) {
         JsonObject result = new JsonObject();
-        result.addProperty("command", command);
+        result.addProperty("text", message);
         
         try {
-            if (minecraftServer != null) {
-                Object commandManager = getCommandManager();
-                Object commandSource = getCommandSource();
-                
-                if (commandManager != null && commandSource != null) {
-                    // Use reflection to call execute method
-                    Method execute = commandManager.getClass().getMethod("execute", Object.class, String.class);
-                    int success = (int) execute.invoke(commandManager, commandSource, command);
-                    
-                    result.addProperty("success", success > 0);
-                    result.addProperty("output", success > 0 ? "Command executed successfully" : "Command failed");
-                    System.out.println("Executed command: " + command + " - Success: " + (success > 0));
-                } else {
-                    result.addProperty("success", false);
-                    result.addProperty("output", "Command manager not available");
-                }
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player != null) {
+                // Sending chat via the player object
+                mc.player.chat(message);
+                result.addProperty("success", true);
+                result.addProperty("output", "Message sent to chat");
             } else {
                 result.addProperty("success", false);
-                result.addProperty("output", "Server not available");
+                result.addProperty("output", "Player not available (not in world?)");
             }
         } catch (Exception e) {
             result.addProperty("success", false);
             result.addProperty("output", "Error: " + e.getMessage());
-            System.err.println("Error executing command: " + command + " - " + e.getMessage());
         }
         
         return result;
     }
     
-    // ==================== HTTP Handlers ====================
-    
-    class ExecuteCommandHandler implements HttpHandler {
+    class ChatHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             if (!authenticate(exchange)) {
-                sendError(exchange, 401, "Unauthorized - Invalid or missing token");
-                return;
-            }
-            
-            if (minecraftServer == null) {
-                sendError(exchange, 503, "Server not running");
+                sendError(exchange, 401, "Unauthorized");
                 return;
             }
             
@@ -249,35 +129,28 @@ public class HttpServerManager {
                     requestBody = new String(baos.toByteArray(), StandardCharsets.UTF_8);
                 }
                 JsonObject request = GSON.fromJson(requestBody, JsonObject.class);
-                
                 JsonObject response = new JsonObject();
                 
-                if (request.has("commands")) {
-                    // Multiple commands
-                    JsonArray commands = request.getAsJsonArray("commands");
+                if (request.has("text") || request.has("command")) {
+                    String msg = request.has("text") ? request.get("text").getAsString() : request.get("command").getAsString();
+                    response.add("result", sendChatMessage(msg));
+                    response.addProperty("success", true);
+                } else if (request.has("messages")) {
+                    JsonArray messages = request.getAsJsonArray("messages");
                     JsonArray results = new JsonArray();
-                    
-                    for (int i = 0; i < commands.size(); i++) {
-                        String command = commands.get(i).getAsString();
-                        results.add(executeCommand(command));
+                    for (int i = 0; i < messages.size(); i++) {
+                        results.add(sendChatMessage(messages.get(i).getAsString()));
                     }
-                    
                     response.add("results", results);
-                } else if (request.has("command")) {
-                    // Single command
-                    String command = request.get("command").getAsString();
-                    response.add("result", executeCommand(command));
+                    response.addProperty("success", true);
                 } else {
-                    sendError(exchange, 400, "Missing 'command' or 'commands' field");
+                    sendError(exchange, 400, "Missing 'text' or 'messages' field");
                     return;
                 }
                 
-                response.addProperty("success", true);
                 sendJson(exchange, 200, response);
-                
             } catch (Exception e) {
-                System.err.println("Error executing command: " + e.getMessage());
-                sendError(exchange, 500, "Internal server error: " + e.getMessage());
+                sendError(exchange, 500, "Internal error: " + e.getMessage());
             }
         }
     }
@@ -292,50 +165,15 @@ public class HttpServerManager {
             
             JsonObject status = new JsonObject();
             status.addProperty("status", "running");
-            status.addProperty("mod", "Command API");
-            status.addProperty("version", "1.0.0");
-            status.addProperty("server_loaded", minecraftServer != null);
+            status.addProperty("mode", "client-chat");
             
-            if (minecraftServer != null) {
-                status.addProperty("player_count", getPlayerCount());
-                status.addProperty("max_players", getMaxPlayers());
-                status.addProperty("server_name", "Fabric Server");
+            Minecraft mc = Minecraft.getInstance();
+            status.addProperty("in_world", mc.player != null);
+            if (mc.player != null) {
+                status.addProperty("player_name", mc.player.getName().getString());
             }
             
             sendJson(exchange, 200, status);
-        }
-    }
-    
-    class StopHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            if (!authenticate(exchange)) {
-                sendError(exchange, 401, "Unauthorized");
-                return;
-            }
-            
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendError(exchange, 405, "Method not allowed - Use POST");
-                return;
-            }
-            
-            JsonObject response = new JsonObject();
-            response.addProperty("success", true);
-            response.addProperty("message", "Server shutdown initiated");
-            sendJson(exchange, 200, response);
-            
-            // Schedule server shutdown
-            if (minecraftServer != null) {
-                new Thread(() -> {
-                    try {
-                        Thread.sleep(1000);
-                        // Try to shut down the server
-                        System.exit(0);
-                    } catch (Exception e) {
-                        System.err.println("Error shutting down server: " + e.getMessage());
-                    }
-                }).start();
-            }
         }
     }
 }
