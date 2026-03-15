@@ -5,7 +5,7 @@ plugins {
 def minecraft_version = project.findProperty('minecraft_version') ?: '1.19.4'
 def yarn_mappings = project.findProperty('yarn_mappings') ?: '1.19.4+build.8'
 def loader_version = project.findProperty('loader_version') ?: '0.14.21'
-def fabric_version = project.findProperty('fabric_version') ?: '0.87.2+1.19.4'
+def fabric_version = project.findProperty('fabric_version') ?: '0.18.0+build.387-1.16.1'
 
 println "Building for Minecraft ${minecraft_version} with Fabric Loader ${loader_version}"
 
