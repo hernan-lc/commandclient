@@ -23,6 +23,7 @@ build/
 *.war
 *.ear
 hs_err_pid*
+*.hprof
 
 # OS
 .DS_Store
