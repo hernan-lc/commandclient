@@ -19,6 +19,7 @@ through the current 26.x releases: shared HTTP, config and API code lives in
 - [Supported versions](docs/VERSIONS.md) (generated)
 - [Adding a Minecraft version](docs/ADDING_VERSION.md)
 - [Security](docs/SECURITY.md)
+- [Releasing](docs/RELEASING.md)
 - [Runtime verification](docs/RUNTIME_VERIFICATION.md)
 - [CI](docs/CI.md)
 

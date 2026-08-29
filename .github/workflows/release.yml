@@ -44,14 +44,20 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
+      # Checked before the ~3 minute build so a mistake surfaces in seconds.
       - name: Check the tag matches versions.json
         run: |
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
           EXPECTED="v${{ steps.jdks.outputs.mod_version }}"
           if [ "$TAG" != "$EXPECTED" ]; then
-            echo "::error::tag $TAG does not match modVersion in versions.json (expected $EXPECTED)"
+            echo "::error title=Tag/version mismatch::tag $TAG does not match modVersion \
+          in versions.json (expected $EXPECTED). The JARs this build produces would be named \
+          ${{ steps.jdks.outputs.mod_version }}, not ${TAG#v}. To release ${TAG#v}: set modVersion \
+          to ${TAG#v} in versions.json, run ./gradlew buildAllVersions versionTable, commit, then \
+          move the $TAG tag onto that commit (git tag -f $TAG && git push -f origin $TAG)."
             exit 1
           fi
+          echo "tag $TAG matches modVersion ${{ steps.jdks.outputs.mod_version }}"
 
       # A release must not be published if any configured target fails, so this
       # builds them all in one run rather than a matrix.
@@ -78,13 +84,27 @@ jobs:
           } > release-notes.md
           cat release-notes.md
 
+      # Creating a release in the GitHub UI also creates its tag, which triggers
+      # this workflow - so by the time it runs, the release may already exist.
+      # Upload into it rather than failing on a name clash.
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
-          gh release create "$TAG" \
-            --title "Command API $TAG" \
-            --notes-file release-notes.md \
-            build/distributions/*.jar \
-            build/distributions/manifest.json
+          ASSETS=(build/distributions/*.jar build/distributions/manifest.json)
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG already exists; updating it in place"
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
+            gh release edit "$TAG" --title "Command API $TAG" --notes-file release-notes.md
+          else
+            echo "creating release $TAG"
+            gh release create "$TAG" \
+              --title "Command API $TAG" \
+              --notes-file release-notes.md \
+              "${ASSETS[@]}"
+          fi
+
+          echo "published $(ls build/distributions/*.jar | wc -l) JARs to $TAG"
+          gh release view "$TAG" --json assets --jq '.assets[].name'
