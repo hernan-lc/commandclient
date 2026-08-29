@@ -3,6 +3,12 @@
 
 The documentation generator refuses to claim CI success on its own: it only
 reports a target as CI verified if this file says a real workflow run built it.
+
+The file is committed, so the generated tables are reproducible from a clean
+checkout and `--check` gives the same answer locally and in CI. It is the
+evidence behind every CI claim in the docs, so it belongs in the repository
+rather than in an untracked build directory.
+
 Requires the `gh` CLI to be installed and authenticated.
 
 Usage: python3 scripts/fetch-ci-status.py [--workflow Build] [--branch main]
@@ -15,7 +21,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / "build" / "ci-status.json"
+OUT = ROOT / "ci-status.json"
 
 
 def gh(*args):

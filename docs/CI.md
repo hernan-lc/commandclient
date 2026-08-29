@@ -58,7 +58,9 @@ git commit -am "docs: record CI verification"
 ```
 
 `fetch-ci-status.py` reads the latest run with the `gh` CLI and writes
-`build/ci-status.json`. The table generator only marks a target CI verified if
+`ci-status.json`, which is committed: it is the evidence behind every CI claim
+in the docs, so the tables regenerate identically from a clean checkout and
+`--check` behaves the same locally and on a runner. The table generator only marks a target CI verified if
 that file says a matrix job for it concluded `success`. It cannot be talked into
 it any other way — a local build never sets the CI column.
 

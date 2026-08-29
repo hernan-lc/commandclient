@@ -26,7 +26,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 VERSIONS_JSON = ROOT / "versions.json"
 MANIFEST = ROOT / "build" / "distributions" / "manifest.json"
-CI_STATUS = ROOT / "build" / "ci-status.json"
+CI_STATUS = ROOT / "ci-status.json"
 VERSIONS_DOC = ROOT / "docs" / "VERSIONS.md"
 README = ROOT / "README.md"
 
