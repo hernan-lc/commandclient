@@ -11,7 +11,11 @@ rather than in an untracked build directory.
 
 Requires the `gh` CLI to be installed and authenticated.
 
-Usage: python3 scripts/fetch-ci-status.py [--workflow Build] [--branch main]
+Usage: python3 scripts/fetch-ci-status.py [--repo OWNER/NAME] [--workflow Build]
+                                          [--branch main]
+
+--repo records from a different repository, which is what you want when CI runs
+on a fork rather than on the origin remote.
 """
 
 import argparse
@@ -24,8 +28,11 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "ci-status.json"
 
 
-def gh(*args):
-    result = subprocess.run(["gh", *args], capture_output=True, text=True)
+def gh(*args, repo=None):
+    command = ["gh", *args]
+    if repo:
+        command += ["--repo", repo]
+    result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or f"gh {' '.join(args)} failed")
     return result.stdout
@@ -33,6 +40,8 @@ def gh(*args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--repo", default=None,
+                        help="OWNER/NAME to read runs from (default: the current repository)")
     parser.add_argument("--workflow", default="Build")
     parser.add_argument("--branch", default="main")
     args = parser.parse_args()
@@ -42,7 +51,8 @@ def main():
     try:
         runs = json.loads(gh("run", "list", "--workflow", args.workflow, "--branch", args.branch,
                              "--limit", "1", "--json",
-                             "databaseId,conclusion,status,headSha,url,createdAt"))
+                             "databaseId,conclusion,status,headSha,url,createdAt",
+                             repo=args.repo))
     except (RuntimeError, FileNotFoundError) as exc:
         print(f"error: could not query GitHub Actions ({exc})", file=sys.stderr)
         return 1
@@ -52,7 +62,8 @@ def main():
         return 1
 
     run = runs[0]
-    jobs = json.loads(gh("run", "view", str(run["databaseId"]), "--json", "jobs"))["jobs"]
+    jobs = json.loads(gh("run", "view", str(run["databaseId"]), "--json", "jobs",
+                         repo=args.repo))["jobs"]
 
     # Matrix jobs are named "Minecraft <version>".
     verified = {}
@@ -67,6 +78,7 @@ def main():
     aggregate = next((j for j in jobs if j["name"].strip() == "Collect and verify"), None)
 
     status = {
+        "repository": args.repo or "origin",
         "workflow": args.workflow,
         "branch": args.branch,
         "runId": run["databaseId"],

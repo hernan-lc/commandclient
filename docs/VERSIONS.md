@@ -16,26 +16,26 @@ A local build says nothing about CI, and neither says the mod was ever run in th
 
 Build manifest: `1.2.0`, 14 artifact(s).
 
-CI status: workflow **Build** run [33274491276](https://github.com/nglmercer/commandclient/actions/runs/33274491276) on `main` (failure), recorded from commit `8e3a9bb2`.
+CI status: workflow **Build** run [33277870501](https://github.com/hernan-lc/commandclient/actions/runs/33277870501) on `main` (failure), recorded from commit `4d2b4197`.
 
-In that run **14 target job(s) never executed** (status: missing). They are shown as `—`, not as failures: the code was never built there.
+Every one of the 14 target jobs in that run succeeded; the run is marked failed because a later job did not (`Collect and verify`: failure). The per-target ticks below reflect the target jobs themselves.
 
 | Minecraft | Tier | Java | Loader | Build family | Adapter | Artifact | CI | Runtime | File |
 | --------- | :--: | ---: | ------ | ------------ | ------- | :------: | :-: | :-----: | ---- |
-| 1.16.1 | D | 8 | 0.14.24 | legacy-remapped | legacy-chat | ✅ | — | — | `commandapi-1.2.0+mc1.16.1.jar` |
-| 1.16.5 | C | 8 | 0.14.24 | legacy-remapped | legacy-chat | ✅ | — | — | `commandapi-1.2.0+mc1.16.5.jar` |
-| 1.18.2 | C | 17 | 0.16.14 | legacy-remapped | legacy-chat | ✅ | — | — | `commandapi-1.2.0+mc1.18.2.jar` |
-| 1.19.2 | C | 17 | 0.16.14 | legacy-remapped | signed-chat | ✅ | — | — | `commandapi-1.2.0+mc1.19.2.jar` |
-| 1.19.4 | D | 17 | 0.16.14 | legacy-remapped | network-chat | ✅ | — | — | `commandapi-1.2.0+mc1.19.4.jar` |
-| 1.20.1 | C | 17 | 0.16.14 | legacy-remapped | network-chat | ✅ | — | — | `commandapi-1.2.0+mc1.20.1.jar` |
-| 1.20.4 | D | 17 | 0.16.14 | legacy-remapped | network-chat | ✅ | — | — | `commandapi-1.2.0+mc1.20.4.jar` |
-| 1.20.6 | C | 21 | 0.16.14 | legacy-remapped | network-chat | ✅ | — | — | `commandapi-1.2.0+mc1.20.6.jar` |
-| 1.21.1 | B | 21 | 0.16.14 | legacy-remapped | network-chat | ✅ | — | — | `commandapi-1.2.0+mc1.21.1.jar` |
-| 1.21.4 | B | 21 | 0.16.14 | legacy-remapped | network-chat | ✅ | — | — | `commandapi-1.2.0+mc1.21.4.jar` |
-| 1.21.8 | B | 21 | 0.19.3 | legacy-remapped | network-chat | ✅ | — | — | `commandapi-1.2.0+mc1.21.8.jar` |
-| 1.21.11 | B | 21 | 0.19.3 | legacy-remapped | network-chat | ✅ | — | — | `commandapi-1.2.0+mc1.21.11.jar` |
-| 26.1 | B | 25 | 0.19.5 | modern-unobfuscated | network-chat | ✅ | — | — | `commandapi-1.2.0+mc26.1.jar` |
-| 26.2 | A | 25 | 0.19.5 | modern-unobfuscated | network-chat | ✅ | — | — | `commandapi-1.2.0+mc26.2.jar` |
+| 1.16.1 | D | 8 | 0.14.24 | legacy-remapped | legacy-chat | ✅ | ✅ | — | `commandapi-1.2.0+mc1.16.1.jar` |
+| 1.16.5 | C | 8 | 0.14.24 | legacy-remapped | legacy-chat | ✅ | ✅ | — | `commandapi-1.2.0+mc1.16.5.jar` |
+| 1.18.2 | C | 17 | 0.16.14 | legacy-remapped | legacy-chat | ✅ | ✅ | — | `commandapi-1.2.0+mc1.18.2.jar` |
+| 1.19.2 | C | 17 | 0.16.14 | legacy-remapped | signed-chat | ✅ | ✅ | — | `commandapi-1.2.0+mc1.19.2.jar` |
+| 1.19.4 | D | 17 | 0.16.14 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.2.0+mc1.19.4.jar` |
+| 1.20.1 | C | 17 | 0.16.14 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.2.0+mc1.20.1.jar` |
+| 1.20.4 | D | 17 | 0.16.14 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.2.0+mc1.20.4.jar` |
+| 1.20.6 | C | 21 | 0.16.14 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.2.0+mc1.20.6.jar` |
+| 1.21.1 | B | 21 | 0.16.14 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.2.0+mc1.21.1.jar` |
+| 1.21.4 | B | 21 | 0.16.14 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.2.0+mc1.21.4.jar` |
+| 1.21.8 | B | 21 | 0.19.3 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.2.0+mc1.21.8.jar` |
+| 1.21.11 | B | 21 | 0.19.3 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.2.0+mc1.21.11.jar` |
+| 26.1 | B | 25 | 0.19.5 | modern-unobfuscated | network-chat | ✅ | ✅ | — | `commandapi-1.2.0+mc26.1.jar` |
+| 26.2 | A | 25 | 0.19.5 | modern-unobfuscated | network-chat | ✅ | ✅ | — | `commandapi-1.2.0+mc26.2.jar` |
 
 ## Support tiers
 

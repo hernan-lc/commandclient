@@ -1,69 +1,70 @@
 {
+    "repository": "hernan-lc/commandclient",
     "workflow": "Build",
     "branch": "main",
-    "runId": 33274491276,
-    "runUrl": "https://github.com/nglmercer/commandclient/actions/runs/33274491276",
+    "runId": 33277870501,
+    "runUrl": "https://github.com/hernan-lc/commandclient/actions/runs/33277870501",
     "runConclusion": "failure",
     "runStatus": "completed",
-    "headSha": "8e3a9bb2c0b2625d9d9c33d773ba48e75a652811",
-    "createdAt": "2026-08-29T20:49:53Z",
+    "headSha": "4d2b4197ba20cfa0e4f23505fc449d84dce61716",
+    "createdAt": "2026-08-29T22:09:27Z",
     "aggregateConclusion": "failure",
     "targets": {
         "26.2": {
-            "conclusion": "missing",
-            "verified": false
+            "conclusion": "success",
+            "verified": true
         },
         "26.1": {
-            "conclusion": "missing",
-            "verified": false
+            "conclusion": "success",
+            "verified": true
         },
         "1.21.11": {
-            "conclusion": "missing",
-            "verified": false
+            "conclusion": "success",
+            "verified": true
         },
         "1.21.8": {
-            "conclusion": "missing",
-            "verified": false
+            "conclusion": "success",
+            "verified": true
         },
         "1.21.4": {
-            "conclusion": "missing",
-            "verified": false
+            "conclusion": "success",
+            "verified": true
         },
         "1.21.1": {
-            "conclusion": "missing",
-            "verified": false
+            "conclusion": "success",
+            "verified": true
         },
         "1.20.6": {
-            "conclusion": "missing",
-            "verified": false
+            "conclusion": "success",
+            "verified": true
         },
         "1.20.4": {
-            "conclusion": "missing",
-            "verified": false
+            "conclusion": "success",
+            "verified": true
         },
         "1.20.1": {
-            "conclusion": "missing",
-            "verified": false
+            "conclusion": "success",
+            "verified": true
         },
         "1.19.4": {
-            "conclusion": "missing",
-            "verified": false
+            "conclusion": "success",
+            "verified": true
         },
         "1.19.2": {
-            "conclusion": "missing",
-            "verified": false
+            "conclusion": "success",
+            "verified": true
         },
         "1.18.2": {
-            "conclusion": "missing",
-            "verified": false
+            "conclusion": "success",
+            "verified": true
         },
         "1.16.5": {
-            "conclusion": "missing",
-            "verified": false
+            "conclusion": "success",
+            "verified": true
         },
         "1.16.1": {
-            "conclusion": "missing",
-            "verified": false
+            "conclusion": "success",
+            "verified": true
         }
     }
 }

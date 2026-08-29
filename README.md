@@ -38,20 +38,20 @@ through the current 26.x releases: shared HTTP, config and API code lives in
 
 | Minecraft | Tier | Java | Artifact built | CI verified | Runtime verified |
 |---|:--:|---:|:--:|:--:|:--:|
-| 1.16.1 | D | 8 | ✅ | — | — |
-| 1.16.5 | C | 8 | ✅ | — | — |
-| 1.18.2 | C | 17 | ✅ | — | — |
-| 1.19.2 | C | 17 | ✅ | — | — |
-| 1.19.4 | D | 17 | ✅ | — | — |
-| 1.20.1 | C | 17 | ✅ | — | — |
-| 1.20.4 | D | 17 | ✅ | — | — |
-| 1.20.6 | C | 21 | ✅ | — | — |
-| 1.21.1 | B | 21 | ✅ | — | — |
-| 1.21.4 | B | 21 | ✅ | — | — |
-| 1.21.8 | B | 21 | ✅ | — | — |
-| 1.21.11 | B | 21 | ✅ | — | — |
-| 26.1 | B | 25 | ✅ | — | — |
-| 26.2 | A | 25 | ✅ | — | — |
+| 1.16.1 | D | 8 | ✅ | ✅ | — |
+| 1.16.5 | C | 8 | ✅ | ✅ | — |
+| 1.18.2 | C | 17 | ✅ | ✅ | — |
+| 1.19.2 | C | 17 | ✅ | ✅ | — |
+| 1.19.4 | D | 17 | ✅ | ✅ | — |
+| 1.20.1 | C | 17 | ✅ | ✅ | — |
+| 1.20.4 | D | 17 | ✅ | ✅ | — |
+| 1.20.6 | C | 21 | ✅ | ✅ | — |
+| 1.21.1 | B | 21 | ✅ | ✅ | — |
+| 1.21.4 | B | 21 | ✅ | ✅ | — |
+| 1.21.8 | B | 21 | ✅ | ✅ | — |
+| 1.21.11 | B | 21 | ✅ | ✅ | — |
+| 26.1 | B | 25 | ✅ | ✅ | — |
+| 26.2 | A | 25 | ✅ | ✅ | — |
 
 `—` means not verified, not failed. See [docs/VERSIONS.md](docs/VERSIONS.md) for what each column means.
 <!-- SUPPORTED_VERSIONS_END -->
@@ -61,9 +61,9 @@ by `python3 scripts/generate-version-table.py` — do not edit by hand. See
 [docs/VERSIONS.md](docs/VERSIONS.md) for the full table with build families,
 adapter families and per-column meanings.
 
-> **CI is currently blocked.** GitHub Actions cannot run on this repository —
-> the account is locked for billing, so every job is cancelled before it starts.
-> No target is therefore marked CI verified. See [docs/CI.md](docs/CI.md).
+> **Where CI runs.** GitHub Actions is billing-locked on `nglmercer/commandclient`,
+> so CI runs on the `hernan-lc/commandclient` fork instead. The CI column above
+> is recorded from real runs there. See [docs/CI.md](docs/CI.md).
 
 ### Support policy
 

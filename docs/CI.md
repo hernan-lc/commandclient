@@ -28,41 +28,40 @@ shared                   ▼
 still runs and names the missing version instead of being skipped, so the
 failure report is specific.
 
-## Current status: blocked by billing, not by the code
+## Where CI runs
 
-At the time of writing, **GitHub Actions cannot run on this repository**. Every
-job is cancelled before it starts with:
+GitHub Actions is **billing-locked on `nglmercer/commandclient`**: every job
+there is cancelled before it starts with
 
 ```
 The job was not started because your account is locked due to a billing issue.
 ```
 
-Runs [33274408717](https://github.com/nglmercer/commandclient/actions/runs/33274408717)
-and [33274491276](https://github.com/nglmercer/commandclient/actions/runs/33274491276)
-both failed this way after ~6 seconds, with all jobs cancelled and zero steps
-executed. That is an account-level block: no workflow change can fix it, and it
-would happen to any workflow in the repository.
+That is an account-level block; no workflow change fixes it. CI therefore runs
+on the **`hernan-lc/commandclient`** fork, and `ci-status.json` records which
+repository each result came from.
 
-**Nothing in this project claims CI verification while that is true.** The
-generated tables show `—` for every target's CI column, and
-`docs/VERSIONS.md` says how many jobs never executed.
+First green matrix there:
+[run 33277870501](https://github.com/hernan-lc/commandclient/actions/runs/33277870501) —
+all 14 Minecraft targets built, including 26.1/26.2 on Java 25 and 1.16.x on
+Java 8, plus the shared tests and the Minecraft-import gate.
 
-### Once billing is fixed
+## Recording what CI verified
 
 ```bash
-git push                                   # triggers the Build workflow
-gh run watch                               # follow it
-python3 scripts/fetch-ci-status.py         # record what CI actually verified
-python3 scripts/generate-version-table.py  # tables now show real CI results
+python3 scripts/fetch-ci-status.py --repo hernan-lc/commandclient
+python3 scripts/generate-version-table.py
 git commit -am "docs: record CI verification"
 ```
 
-`fetch-ci-status.py` reads the latest run with the `gh` CLI and writes
-`ci-status.json`, which is committed: it is the evidence behind every CI claim
-in the docs, so the tables regenerate identically from a clean checkout and
-`--check` behaves the same locally and on a runner. The table generator only marks a target CI verified if
-that file says a matrix job for it concluded `success`. It cannot be talked into
-it any other way — a local build never sets the CI column.
+`--repo` matters: without it the script reads the origin remote, which is the
+billing-locked repository. The generator marks a target CI verified only if
+`ci-status.json` says a matrix job for it concluded `success`; a local build
+can never set that column.
+
+`ci-status.json` is committed, so the tables regenerate identically from a
+clean checkout and `--check` behaves the same locally and on a runner. Refresh
+it and regenerate whenever you want the docs to reflect a newer run.
 
 ## Verifying the workflows without runners
 

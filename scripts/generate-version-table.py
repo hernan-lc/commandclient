@@ -18,6 +18,7 @@ Usage: python3 scripts/generate-version-table.py [--check]
 """
 
 import argparse
+import difflib
 import json
 import re
 import sys
@@ -111,6 +112,19 @@ def versions_doc(data, manifest, ci):
             f"({ci['runConclusion']}), recorded from commit `{ci['headSha'][:8]}`.",
             "",
         ]
+        verified_count = sum(1 for t in ci.get("targets", {}).values() if t.get("verified"))
+        if ci["runConclusion"] != "success" and verified_count == len(ci.get("targets", {})):
+            # Every target job passed but the run still failed, so the failure was
+            # in a job that is not a Minecraft target. Say so, or the ticks below
+            # look like they contradict the run result.
+            lines += [
+                f"Every one of the {verified_count} target jobs in that run succeeded; the run "
+                f"is marked failed because a later job did not "
+                f"(`Collect and verify`: {ci.get('aggregateConclusion', 'unknown')}). "
+                "The per-target ticks below reflect the target jobs themselves.",
+                "",
+            ]
+
         never_ran = sorted((mc for mc, t in ci.get("targets", {}).items()
                             if not t.get("verified") and t.get("conclusion") != "failure"),
                            key=version_key)
@@ -226,8 +240,20 @@ def main():
     if args.check:
         for path in stale:
             print(f"out of date: {path.relative_to(ROOT)}", file=sys.stderr)
+            # Show what differs: "out of date" alone is useless in a CI log.
+            current = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
+            diff = difflib.unified_diff(
+                current, outputs[path].splitlines(),
+                fromfile=f"{path.name} (committed)", tofile=f"{path.name} (regenerated)",
+                lineterm="", n=1)
+            for line in diff:
+                print(f"  {line}", file=sys.stderr)
         if stale:
-            print("Run: python3 scripts/generate-version-table.py", file=sys.stderr)
+            print("\nRun: python3 scripts/generate-version-table.py", file=sys.stderr)
+            if ci is None:
+                print("note: no ci-status.json was found, so the CI columns were "
+                      "regenerated as unverified. If the committed tables cite a CI "
+                      "run, that file must be committed too.", file=sys.stderr)
             return 1
         print("Generated version tables are up to date.")
         return 0
