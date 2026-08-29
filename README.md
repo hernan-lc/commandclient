@@ -32,6 +32,8 @@ only a small adapter under `versions/`.
 |---|---|---|
 | 1.16.1 | ✅ Build passing | `commandapi-1.1.0+mc1.16.1.jar` |
 | 1.19.4 | ✅ Build passing | `commandapi-1.1.0+mc1.19.4.jar` |
+| 1.20.1 | ✅ Build passing | `commandapi-1.1.0+mc1.20.1.jar` |
+| 1.20.4 | ✅ Build passing | `commandapi-1.1.0+mc1.20.4.jar` |
 
 <!-- SUPPORTED_VERSIONS_END -->
 
