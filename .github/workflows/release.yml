@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish every supported version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Every JDK any target needs to build, taken from versions.json.
+      - name: Collect required JDKs
+        id: jdks
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          data = json.load(open("versions.json"))
+          jdks = sorted({int(spec["buildJava"]) for spec in data["versions"].values()})
+          print("list<<EOF")
+          for jdk in jdks:
+              print(jdk)
+          print("EOF")
+          print("from_env=" + ",".join(f"JAVA_HOME_{jdk}_X64" for jdk in jdks))
+          print("mod_version=" + data["modVersion"])
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ steps.jdks.outputs.list }}
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Check the tag matches versions.json
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          EXPECTED="v${{ steps.jdks.outputs.mod_version }}"
+          if [ "$TAG" != "$EXPECTED" ]; then
+            echo "::error::tag $TAG does not match modVersion in versions.json (expected $EXPECTED)"
+            exit 1
+          fi
+
+      # A release must not be published if any configured target fails, so this
+      # builds them all in one run rather than a matrix.
+      - name: Build all versions
+        run: ./gradlew buildAllVersions -Porg.gradle.java.installations.fromEnv=${{ steps.jdks.outputs.from_env }}
+
+      - name: Verify artifacts against versions.json
+        run: python3 scripts/verify-builds.py
+
+      - name: Build release notes
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          python3 scripts/generate-version-table.py
+          {
+            echo "## Command API $TAG"
+            echo
+            echo "One JAR per supported Minecraft version. Drop the matching file into your \`mods/\` folder."
+            echo
+            sed -n '/^| Minecraft /,/^$/p' docs/VERSIONS.md
+            echo "\`manifest.json\` lists the same artifacts in machine-readable form."
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          gh release create "$TAG" \
+            --title "Command API $TAG" \
+            --notes-file release-notes.md \
+            build/distributions/*.jar \
+            build/distributions/manifest.json

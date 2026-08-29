@@ -1,0 +1,48 @@
+// Version independent code: HTTP server, config, request/response model and the
+// MinecraftBridge interface. It must never import Minecraft or Fabric classes.
+//
+// Version modules compile these sources directly into their own JAR (see
+// gradle/fabric-version-module.gradle); this module exists so the shared code
+// can be compiled and unit tested without Loom or a Minecraft dependency.
+
+plugins {
+    id 'java-library'
+}
+
+// Source level of the oldest supported target, so shared code cannot use APIs
+// that would break on Minecraft 1.16.1.
+def oldestJava = rootProject.ext.versionSpecs.values().collect { it.java as int }.min()
+def buildJava = rootProject.ext.versionSpecs.values().collect { it.buildJava as int }.min()
+
+version = rootProject.ext.modVersion
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Provided by Minecraft at runtime; needed here to compile and test.
+    api 'com.google.code.gson:gson:2.10.1'
+
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(buildJava)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = oldestJava
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    testLogging {
+        events 'failed'
+    }
+}

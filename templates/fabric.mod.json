@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${mod_version}",
+  "name": "Command API",
+  "description": "Client-side REST API for sending chat messages and commands as the local Minecraft player.",
+  "authors": [
+    "nglmercer"
+  ],
+  "contact": {
+    "homepage": "https://github.com/nglmercer/commandclient",
+    "sources": "https://github.com/nglmercer/commandclient",
+    "issues": "https://github.com/nglmercer/commandclient/issues"
+  },
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.commandapi.version.CommandApiMod"
+    ]
+  },
+  "mixins": [],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "${minecraft_version}",
+    "java": ">=${java_version}"
+  },
+  "suggests": {
+    "${fabric_api_mod_id}": ">=${fabric_api_version}"
+  }
+}

@@ -1,27 +1,48 @@
-const BASE_URL = 'http://localhost:8080';
-const TOKEN = 'tu-token-secreto'; // Cambia esto por tu token real
-async function ejecutarComando() {
-  try {
-    const response = await fetch(`${BASE_URL}/api/execute`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${TOKEN}` // Quitar si la auth está desactivada
-      },
-      body: JSON.stringify({
-        command: "/seed"
-      })
-    });
+// Minimal Command API client.
+// Run with: node docs/example.js "hello world"
 
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.error || 'Error al ejecutar el comando');
-    }
+const BASE_URL = process.env.COMMANDAPI_URL || 'http://127.0.0.1:8080';
+const TOKEN = process.env.COMMANDAPI_TOKEN || null; // needed only when authEnabled is true
 
-    console.log('Resultado:', data);
-  } catch (error) {
-    console.error('Error:', error.message);
-  }
+function headers() {
+  return {
+    'Content-Type': 'application/json',
+    ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+  };
 }
-ejecutarComando()
+
+async function status() {
+  const response = await fetch(`${BASE_URL}/api/status`, { headers: headers() });
+  return response.json();
+}
+
+async function send(text) {
+  const response = await fetch(`${BASE_URL}/api/chat`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ text }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || `HTTP ${response.status}`);
+  }
+  return data;
+}
+
+async function main() {
+  const state = await status();
+  console.log(`Minecraft ${state.minecraft_version}, in world: ${state.in_world}`);
+  if (!state.in_world) {
+    console.error('Join a world first: messages can only be sent as a player.');
+    return;
+  }
+
+  const text = process.argv[2] || 'hello from the Command API';
+  console.log(await send(text));
+}
+
+main().catch((error) => {
+  console.error('Error:', error.message);
+  process.exitCode = 1;
+});

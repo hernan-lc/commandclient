@@ -1,60 +1,119 @@
-plugins {
-    id 'fabric-loom'
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+
+// ---------------------------------------------------------------------------
+// versions.json drives everything: module list, dependency versions, Java
+// levels, artifact names, generated metadata, CI matrix and docs.
+// ---------------------------------------------------------------------------
+def versionsJson = new JsonSlurper().parse(file('versions.json'))
+
+// Read by common/build.gradle and gradle/fabric-version-module.gradle.
+ext {
+    modVersion = versionsJson.modVersion
+    versionSpecs = versionsJson.versions
 }
 
-def minecraft_version = project.findProperty('minecraft_version') ?: '1.19.4'
-def yarn_mappings = project.findProperty('yarn_mappings') ?: '1.19.4+build.8'
-def loader_version = project.findProperty('loader_version') ?: '0.14.21'
-def fabric_version = project.findProperty('fabric_version') ?: '0.18.0+build.387-1.16.1'
+allprojects {
+    group = 'com.commandapi'
+}
 
-println "Building for Minecraft ${minecraft_version} with Fabric Loader ${loader_version}"
+// Captured as locals: task configuration blocks do not see the project's extra
+// properties through a bare `ext`.
+def specs = versionsJson.versions
+def modVersionValue = versionsJson.modVersion
+def outputDir = layout.buildDirectory.dir('distributions')
 
-repositories {
-    maven {
-        name = 'Fabric'
-        url = 'https://maven.fabricmc.net/'
+/** The version modules, in versions.json order. */
+def versionProjects = { specs.keySet().collect { project(":versions:${it}") } }
+
+/** Artifact file name for a target, e.g. commandapi-1.1.0+mc1.16.1.jar */
+def artifactNameOf = { String minecraft -> "commandapi-${modVersionValue}+mc${minecraft}.jar" }
+
+tasks.register('collectArtifacts') {
+    group = 'build'
+    description = 'Copies every remapped production JAR into build/distributions and writes manifest.json.'
+
+    dependsOn versionProjects().collect { "${it.path}:remapJar" }
+
+    doLast {
+        def target = outputDir.get().asFile
+        target.mkdirs()
+
+        def artifacts = []
+        specs.each { id, spec ->
+            def remapJar = project(":versions:${id}").tasks.named('remapJar').get()
+            def source = remapJar.archiveFile.get().asFile
+            if (!source.exists()) {
+                throw new GradleException("Minecraft ${spec.minecraft}: expected ${source} but it was not produced.")
+            }
+            def expected = artifactNameOf(spec.minecraft)
+            if (source.name != expected) {
+                throw new GradleException("Minecraft ${spec.minecraft}: produced ${source.name}, expected ${expected}.")
+            }
+            copy {
+                from source
+                into target
+            }
+            artifacts << [
+                    minecraft : spec.minecraft,
+                    java      : spec.java,
+                    loader    : spec.loader,
+                    fabricApi : spec.fabricApi,
+                    file      : expected,
+                    size      : source.length()
+            ]
+        }
+
+        def manifest = [
+                modVersion: modVersionValue,
+                generated : new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
+                artifacts : artifacts
+        ]
+        new File(target, 'manifest.json').text = JsonOutput.prettyPrint(JsonOutput.toJson(manifest)) + '\n'
+
+        artifacts.each { println "Minecraft ${it.minecraft} ... SUCCESS" }
+        println "\nArtifacts:"
+        artifacts.each { println "  ${target}/${it.file}" }
     }
-    maven {
-        name = 'Mojang'
-        url = 'https://libraries.minecraft.net/'
+}
+
+tasks.register('buildAllVersions') {
+    group = 'build'
+    description = 'Builds every Minecraft target declared in versions.json and collects the artifacts.'
+
+    dependsOn versionProjects().collect { "${it.path}:build" }
+    dependsOn 'collectArtifacts'
+    dependsOn ':common:test'
+
+    doLast {
+        println "\nCommand API ${modVersionValue}: built ${specs.size()} Minecraft target(s)."
+        println "Run './gradlew versionTable' to refresh the generated tables."
     }
-    mavenCentral()
 }
 
-dependencies {
-    // Fabric API
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
-    
-    // Fabric Loader
-    modImplementation "net.fabricmc:fabric-loader:${loader_version}"
-    
-    // Minecraft
-    minecraft "com.mojang:minecraft:${minecraft_version}"
-    // Use official mappings for stability
-    mappings loom.officialMojangMappings()
-    
-    // SLF4J for logging
-    implementation 'org.slf4j:slf4j-api:1.7.36'
-    
-    // JSON for config
-    implementation 'com.google.code.gson:gson:2.10.1'
+tasks.register('versionTable', Exec) {
+    group = 'documentation'
+    description = 'Regenerates docs/VERSIONS.md and the README version table from versions.json + manifest.json.'
+    // The tables must describe artifacts the build actually produced.
+    dependsOn 'collectArtifacts'
+    commandLine 'python3', file('scripts/generate-version-table.py').absolutePath
+    workingDir projectDir
 }
 
-// Configure Java toolchain
-java {
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+tasks.register('verifyBuilds', Exec) {
+    group = 'verification'
+    description = 'Verifies the collected artifacts against versions.json.'
+    dependsOn 'collectArtifacts'
+    commandLine 'python3', file('scripts/verify-builds.py').absolutePath
+    workingDir projectDir
 }
 
-tasks.withType(JavaCompile).configureEach {
-    it.options.encoding = 'UTF-8'
-    it.options.release = 8
-}
-
-processResources {
-    inputs.property 'version', project.version
-    
-    filesMatching('fabric.mod.json') {
-        expand 'version': project.version
+tasks.register('printVersions') {
+    group = 'help'
+    description = 'Prints the configured Minecraft targets.'
+    doLast {
+        specs.each { id, spec ->
+            println "${id}\tjava=${spec.java}\tloader=${spec.loader}\tfabric-api=${spec.fabricApi}\tmodule=:${spec.module}"
+        }
     }
 }

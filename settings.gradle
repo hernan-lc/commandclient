@@ -1,3 +1,5 @@
+import groovy.json.JsonSlurper
+
 pluginManagement {
     repositories {
         maven {
@@ -14,5 +16,23 @@ pluginManagement {
 
 plugins {
     id 'fabric-loom' version '1.7.4' apply false
-    id 'io.github.juuxel.loom-vineflower' version '1.11.0' apply false
+}
+
+rootProject.name = 'commandapi'
+
+include 'common'
+
+// versions.json is the single source of truth: every entry becomes a Gradle
+// module at versions/<id>. Adding a Minecraft target needs no change here.
+def versionsFile = file('versions.json')
+def versionSpecs = new JsonSlurper().parse(versionsFile).versions
+
+versionSpecs.each { id, spec ->
+    def dir = file("versions/${id}")
+    if (!dir.directory) {
+        throw new GradleException("versions.json declares '${id}' but ${dir} does not exist. " +
+                "See docs/ADDING_VERSION.md.")
+    }
+    include "versions:${id}"
+    project(":versions:${id}").projectDir = dir
 }

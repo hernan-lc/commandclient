@@ -1,0 +1,77 @@
+// Shared build logic for every versions/<minecraft-version> module.
+//
+// A version module contributes only its Minecraft adapter; everything else --
+// dependency versions, Java level, artifact name, generated fabric.mod.json --
+// comes from this file plus the module's entry in versions.json.
+
+def spec = rootProject.ext.versionSpecs[project.name]
+if (spec == null) {
+    throw new GradleException("No entry for '${project.name}' in versions.json. See docs/ADDING_VERSION.md.")
+}
+
+// commandapi-<mod-version>+mc<minecraft-version>.jar
+version = "${rootProject.ext.modVersion}+mc${spec.minecraft}"
+base {
+    archivesName = 'commandapi'
+}
+
+repositories {
+    maven {
+        name = 'Fabric'
+        url = 'https://maven.fabricmc.net/'
+    }
+    maven {
+        name = 'Mojang'
+        url = 'https://libraries.minecraft.net/'
+    }
+    mavenCentral()
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${spec.minecraft}"
+    // One mapping strategy for the whole project (see docs/BUILD.md).
+    mappings loom.officialMojangMappings()
+
+    modImplementation "net.fabricmc:fabric-loader:${spec.loader}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${spec.fabricApi}"
+
+    // Minecraft ships Gson; compile against it without bundling it.
+    compileOnly 'com.google.code.gson:gson:2.10.1'
+}
+
+// The shared sources are compiled into each version JAR. Loom remaps only the
+// module's own output, so keeping one source set is simpler and cheaper than
+// wiring a nested project dependency through remapJar.
+sourceSets.main.java.srcDir rootProject.file('common/src/main/java')
+
+// fabric.mod.json is a single shared template expanded per target.
+sourceSets.main.resources.srcDir rootProject.file('templates')
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(spec.buildJava as int)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    // Bytecode level this Minecraft version requires, independent of the JDK
+    // that compiles it.
+    options.release = spec.java as int
+}
+
+tasks.named('processResources') {
+    def placeholders = [
+            mod_id            : 'commandapi',
+            mod_version       : project.version.toString(),
+            minecraft_version : spec.minecraft.toString(),
+            loader_version    : spec.loader.toString(),
+            fabric_api_mod_id : spec.fabricApiModId.toString(),
+            fabric_api_version: spec.fabricApi.toString().split('\\+')[0],
+            java_version      : spec.java.toString()
+    ]
+    inputs.properties placeholders
+    filesMatching('fabric.mod.json') {
+        expand placeholders
+    }
+}

@@ -1,207 +1,163 @@
-# API Reference
+# API reference
 
-Complete API documentation for the Command API Mod.
+Command API is a **client-side** mod. The HTTP server runs inside your
+Minecraft client and acts as your player: it sends chat messages and commands
+exactly as if you had typed them. It cannot administrate a dedicated server,
+read the player list or stop a server.
 
-## Base URL
-
-```
-http://localhost:8080
-```
+Base URL (default): `http://127.0.0.1:8080`
 
 ## Authentication
 
-If authentication is enabled, all requests must include the `Authorization` header:
-
-```
-Authorization: Bearer <your-token>
-```
-
-## Endpoints
-
----
-
-## POST /api/execute
-
-Execute one or more Minecraft commands.
-
-### Request
-
-**Method:** `POST`  
-**Content-Type:** `application/json`
-
-#### Single Command
+Off by default. Turn it on in `config/commandapi.json`:
 
 ```json
 {
-  "command": "say Hello World"
+  "token": "a-long-random-string",
+  "authEnabled": true
 }
 ```
 
-#### Multiple Commands
+Then send the token on every request:
 
-```json
-{
-  "commands": [
-    "say Hello",
-    "give @s diamond 1",
-    "time set day"
-  ]
-}
+```
+Authorization: Bearer a-long-random-string
 ```
 
-### Response
+Requests without a valid token get `401`. Authentication is skipped when
+`authEnabled` is `false` or the token is empty — which is why the server binds
+loopback by default. Tokens are never written to the log.
 
-**Success (200)**
+## `GET /api/status`
+
+```bash
+curl http://127.0.0.1:8080/api/status
+```
+
 ```json
 {
-  "success": true,
-  "result": {
-    "command": "say Hello World",
-    "success": true,
-    "output": "Command executed successfully"
+  "status": "running",
+  "mode": "client-chat",
+  "mod_version": "1.1.0+mc1.16.1",
+  "minecraft_version": "1.16.1",
+  "host": "127.0.0.1",
+  "port": 8080,
+  "url": "http://127.0.0.1:8080",
+  "auth_enabled": false,
+  "in_world": true,
+  "player_name": "Steve",
+  "endpoints": {
+    "/api/status": "GET - Check API status",
+    "/api/chat": "POST - Send chat message",
+    "/api/execute": "POST - Alias for /api/chat"
   }
 }
 ```
 
-**Multiple Commands Response**
-```json
-{
-  "success": true,
-  "results": [
-    {
-      "command": "say Hello",
-      "success": true,
-      "output": "Command executed successfully"
-    },
-    {
-      "command": "give @s diamond 1",
-      "success": true,
-      "output": "Command executed successfully"
-    }
-  ]
-}
-```
+`player_name` is present only when `in_world` is `true`.
 
-**Error Responses**
+## `POST /api/chat`
 
-| Status | Description |
-|--------|-------------|
-| 400 | Missing 'command' or 'commands' field |
-| 401 | Unauthorized (invalid or missing token) |
-| 405 | Method not allowed (not POST) |
-| 500 | Internal server error |
+Sends one or more messages as the local player. A message starting with `/` is
+sent as a command.
 
----
-
-## GET /api/status
-
-Get current server status.
-
-### Request
-
-**Method:** `GET`  
-**Headers:** `Authorization: Bearer <token>` (if enabled)
-
-### Response
-
-**Success (200)**
-```json
-{
-  "status": "running",
-  "mod": "Command API",
-  "version": "1.0.0",
-  "server_loaded": true,
-  "player_count": 5,
-  "max_players": 20,
-  "server_name": "Fabric Server"
-}
-```
-
-**Error Responses**
-
-| Status | Description |
-|--------|-------------|
-| 401 | Unauthorized |
-
----
-
-## POST /api/stop
-
-Shutdown the Minecraft server.
-
-### Request
-
-**Method:** `POST`  
-**Headers:** `Authorization: Bearer <token>` (if enabled)
-
-### Response
-
-**Success (200)**
-```json
-{
-  "success": true,
-  "message": "Server shutdown initiated"
-}
-```
-
-The server will shutdown 1 second after the request.
-
-**Error Responses**
-
-| Status | Description |
-|--------|-------------|
-| 401 | Unauthorized |
-| 405 | Method not allowed (not POST) |
-
----
-
-## Error Response Format
-
-All errors follow this format:
-
-```json
-{
-  "error": "Error message",
-  "status": 401
-}
-```
-
-## Examples
-
-### cURL
+### One message
 
 ```bash
-# Execute command
-curl -X POST http://localhost:8080/api/execute \
-  -H "Content-Type: application/json" \
-  -d '{"command": "say Hello!"}'
-
-# With authentication
-curl -X POST http://localhost:8080/api/execute \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer my-secret-token" \
-  -d '{"command": "say Hello!"}'
-
-# Get status
-curl http://localhost:8080/api/status
-
-# Stop server
-curl -X POST http://localhost:8080/api/stop
+curl -X POST http://127.0.0.1:8080/api/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "hello world"}'
 ```
 
-### JavaScript (Fetch)
-
-```javascript
-// Execute command
-const response = await fetch('http://localhost:8080/api/execute', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer my-secret-token'
-  },
-  body: JSON.stringify({ command: 'say Hello!' })
-});
-
-const data = await response.json();
-console.log(data);
+```json
+{
+  "result": { "text": "hello world", "success": true, "output": "Message sent to chat" },
+  "success": true
+}
 ```
+
+`{"command": "..."}` is accepted as an alias for `{"text": "..."}`.
+
+### Several messages
+
+```bash
+curl -X POST http://127.0.0.1:8080/api/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"messages": ["hello", "/time set day"]}'
+```
+
+```json
+{
+  "results": [
+    { "text": "hello", "success": true, "output": "Message sent to chat" },
+    { "text": "/time set day", "success": true, "output": "Command sent" }
+  ],
+  "success": true
+}
+```
+
+Messages are sent in order. A failure of one entry does not abort the rest: the
+HTTP status stays `200` and the failing entry carries `"success": false`.
+
+### When you are not in a world
+
+```json
+{
+  "result": { "text": "hello", "success": false, "output": "Player not available (not in world?)" },
+  "success": true
+}
+```
+
+## `POST /api/execute`
+
+Alias of `/api/chat`, kept so existing clients keep working. Same request and
+response format.
+
+## Errors
+
+| Status | When |
+|---|---|
+| `400` | body is not a JSON object, or has no usable `text` / `messages` field |
+| `401` | authentication enabled and the Bearer token is missing or wrong |
+| `405` | `/api/chat` or `/api/execute` called with a method other than POST |
+| `500` | unexpected failure while handling the request |
+
+```json
+{ "error": "Missing 'text' or 'messages' field", "status": 400 }
+```
+
+## Threading
+
+HTTP requests arrive on worker threads, but Minecraft may only be touched from
+the client thread. Every send is scheduled onto the client thread and the
+request waits up to 5 seconds for it; on timeout the entry reports
+`"Timed out waiting for the Minecraft client thread"`. This is handled once, in
+`ClientThreadBridge`, for all versions.
+
+## Example client
+
+```js
+const BASE_URL = 'http://127.0.0.1:8080';
+const TOKEN = null; // set when authEnabled is true
+
+async function send(text) {
+  const response = await fetch(`${BASE_URL}/api/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+    },
+    body: JSON.stringify({ text }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || `HTTP ${response.status}`);
+  }
+  return data;
+}
+
+send('/seed').then(console.log).catch(console.error);
+```
+
+See [example.js](example.js) for a runnable version.
