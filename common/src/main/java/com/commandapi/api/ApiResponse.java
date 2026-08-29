@@ -5,6 +5,7 @@ import com.commandapi.minecraft.ChatResult;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -49,6 +50,23 @@ public final class ApiResponse {
             response.add("result", results.get(0));
         }
         response.addProperty("success", true);
+        return response;
+    }
+
+    /**
+     * Body for a request that could not be attempted because there is no
+     * player. Keeps the shape of a normal chat response (so existing clients
+     * can still read {@code result}/{@code results}) while the HTTP status
+     * says 503.
+     */
+    public static JsonObject unavailable(String reason, List<String> messages, boolean batch) {
+        List<JsonObject> results = new ArrayList<>();
+        for (String message : messages) {
+            results.add(chatResult(message, ChatResult.failure(reason)));
+        }
+        JsonObject response = chat(results, batch);
+        response.addProperty("success", false);
+        response.addProperty("error", reason);
         return response;
     }
 

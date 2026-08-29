@@ -64,6 +64,10 @@ public final class ApiRequest {
             if (array.size() == 0) {
                 throw new ApiRequestException("'messages' must not be empty");
             }
+            if (array.size() > ApiLimits.MAX_BATCH_SIZE) {
+                throw new ApiRequestException("'messages' must contain at most "
+                        + ApiLimits.MAX_BATCH_SIZE + " entries, got " + array.size());
+            }
             List<String> parsed = new ArrayList<>(array.size());
             for (JsonElement item : array) {
                 parsed.add(text(item, "messages entry"));
@@ -85,6 +89,10 @@ public final class ApiRequest {
         String value = element.getAsString();
         if (value.isEmpty()) {
             throw new ApiRequestException(what + " must not be empty");
+        }
+        if (value.length() > ApiLimits.MAX_MESSAGE_LENGTH) {
+            throw new ApiRequestException(what + " must be at most "
+                    + ApiLimits.MAX_MESSAGE_LENGTH + " characters, got " + value.length());
         }
         return value;
     }

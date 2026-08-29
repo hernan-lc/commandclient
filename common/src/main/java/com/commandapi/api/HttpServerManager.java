@@ -20,6 +20,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * The REST API server. Version independent: every Minecraft interaction goes
@@ -29,12 +31,15 @@ import java.util.concurrent.Executors;
  * GET  /api/status   server + player state
  * POST /api/chat     send chat message(s) as the local player
  * POST /api/execute  alias of /api/chat, kept for compatibility
+ * anything else      404 with a JSON body
  * </pre>
+ *
+ * <p>Handlers never let an exception escape: an uncaught error would leave the
+ * client hanging on a half-open connection and kill the worker thread.</p>
  */
 public final class HttpServerManager {
 
     private static final Gson GSON = new Gson();
-    private static final int MAX_BODY_BYTES = 64 * 1024;
 
     private final ApiConfig config;
     private final MinecraftBridge bridge;
@@ -44,6 +49,7 @@ public final class HttpServerManager {
 
     private HttpServer server;
     private ExecutorService executor;
+    private Thread shutdownHook;
 
     public HttpServerManager(ApiConfig config, MinecraftBridge bridge,
                              String modVersion, String minecraftVersion) {
@@ -58,37 +64,78 @@ public final class HttpServerManager {
     public boolean start() {
         try {
             server = HttpServer.create(new InetSocketAddress(config.getHost(), config.getPort()), 0);
-            executor = Executors.newCachedThreadPool();
+            executor = Executors.newCachedThreadPool(daemonThreadFactory());
             server.setExecutor(executor);
 
             server.createContext("/api/chat", new ChatHandler());
             server.createContext("/api/execute", new ChatHandler());
             server.createContext("/api/status", new StatusHandler());
+            // Catch-all so unknown paths get a JSON 404 instead of an empty body.
+            server.createContext("/", new NotFoundHandler());
 
             server.start();
+            registerShutdownHook();
             warnIfInsecurelyExposed();
             System.out.println("[CommandAPI] Listening on http://" + getServerAddress());
             return true;
         } catch (IOException e) {
-            System.err.println("[CommandAPI] Failed to start HTTP server: " + e.getMessage());
+            System.err.println("[CommandAPI] Failed to start HTTP server on "
+                    + config.getHost() + ":" + config.getPort() + " - " + e.getMessage());
             server = null;
             return false;
         }
     }
 
-    public void stop() {
+    /** Stops the server and releases the port. Safe to call more than once. */
+    public synchronized void stop() {
         if (server != null) {
             server.stop(0);
             server = null;
+            System.out.println("[CommandAPI] HTTP server stopped");
         }
         if (executor != null) {
             executor.shutdownNow();
             executor = null;
         }
+        if (shutdownHook != null) {
+            try {
+                Runtime.getRuntime().removeShutdownHook(shutdownHook);
+            } catch (IllegalStateException ignored) {
+                // Already shutting down; the hook is running or has run.
+            }
+            shutdownHook = null;
+        }
     }
 
     public boolean isRunning() {
         return server != null;
+    }
+
+    /**
+     * Worker threads are daemons so a lingering request can never keep the
+     * Minecraft client's JVM alive after the window closes.
+     */
+    private static ThreadFactory daemonThreadFactory() {
+        AtomicInteger counter = new AtomicInteger();
+        return runnable -> {
+            Thread thread = new Thread(runnable, "commandapi-http-" + counter.incrementAndGet());
+            thread.setDaemon(true);
+            return thread;
+        };
+    }
+
+    /**
+     * Releases the port on JVM exit. A Fabric client-stopping event would need
+     * Fabric API, which this mod deliberately does not depend on.
+     */
+    private void registerShutdownHook() {
+        shutdownHook = new Thread(() -> {
+            HttpServer running = server;
+            if (running != null) {
+                running.stop(0);
+            }
+        }, "commandapi-shutdown");
+        Runtime.getRuntime().addShutdownHook(shutdownHook);
     }
 
     /** {@code host:port}, resolved from the bound socket once running. */
@@ -126,8 +173,9 @@ public final class HttpServerManager {
             int len;
             while ((len = is.read(buffer)) != -1) {
                 baos.write(buffer, 0, len);
-                if (baos.size() > MAX_BODY_BYTES) {
-                    throw new ApiRequestException("Request body too large");
+                if (baos.size() > ApiLimits.MAX_BODY_BYTES) {
+                    throw new RequestTooLargeException("Request body exceeds "
+                            + ApiLimits.MAX_BODY_BYTES + " bytes");
                 }
             }
             return new String(baos.toByteArray(), StandardCharsets.UTF_8);
@@ -155,51 +203,91 @@ public final class HttpServerManager {
         return false;
     }
 
-    private final class ChatHandler implements HttpHandler {
+    /**
+     * Wraps a handler so no failure escapes: the client always gets a response
+     * and the exchange is always closed.
+     */
+    private abstract class SafeHandler implements HttpHandler {
         @Override
-        public void handle(HttpExchange exchange) throws IOException {
+        public final void handle(HttpExchange exchange) throws IOException {
             try {
-                if (!authorize(exchange)) {
-                    return;
-                }
-                if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                    sendError(exchange, 405, "Method not allowed - Use POST");
-                    return;
-                }
-
-                ApiRequest request = ApiRequest.parse(readBody(exchange));
-                List<JsonObject> results = new ArrayList<>();
-                for (String message : request.getMessages()) {
-                    ChatResult result = bridge.sendChat(message);
-                    results.add(ApiResponse.chatResult(message, result));
-                }
-                sendJson(exchange, 200, ApiResponse.chat(results, request.isBatch()));
+                handleSafely(exchange);
+            } catch (RequestTooLargeException e) {
+                sendError(exchange, 413, e.getMessage());
             } catch (ApiRequestException e) {
                 sendError(exchange, 400, e.getMessage());
+            } catch (IOException e) {
+                // Client hung up mid-response; nothing left to send.
+                System.err.println("[CommandAPI] Connection error: " + e.getMessage());
             } catch (RuntimeException e) {
-                sendError(exchange, 500, "Internal error: " + e);
+                System.err.println("[CommandAPI] Unhandled error: " + e);
+                try {
+                    sendError(exchange, 500, "Internal error");
+                } catch (IOException ignored) {
+                    // Response already started or client gone.
+                }
             } finally {
                 exchange.close();
             }
         }
+
+        abstract void handleSafely(HttpExchange exchange) throws IOException;
     }
 
-    private final class StatusHandler implements HttpHandler {
+    private final class ChatHandler extends SafeHandler {
         @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            try {
-                if (!authorize(exchange)) {
-                    return;
-                }
-                boolean inWorld = bridge.isInWorld();
-                sendJson(exchange, 200, ApiResponse.status(config, getHost(), getPort(),
-                        inWorld, inWorld ? bridge.getPlayerName() : null,
-                        modVersion, minecraftVersion));
-            } catch (RuntimeException e) {
-                sendError(exchange, 500, "Internal error: " + e);
-            } finally {
-                exchange.close();
+        void handleSafely(HttpExchange exchange) throws IOException {
+            if (!authorize(exchange)) {
+                return;
             }
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                exchange.getResponseHeaders().set("Allow", "POST");
+                sendError(exchange, 405, "Method not allowed - Use POST");
+                return;
+            }
+
+            ApiRequest request = ApiRequest.parse(readBody(exchange));
+
+            // Checked before sending so an offline client gets 503 rather than
+            // a 200 whose body says every message failed.
+            if (!bridge.isInWorld()) {
+                sendJson(exchange, 503, ApiResponse.unavailable(
+                        "Player not available (not in world?)", request.getMessages(), request.isBatch()));
+                return;
+            }
+
+            List<JsonObject> results = new ArrayList<>();
+            for (String message : request.getMessages()) {
+                ChatResult result = bridge.sendChat(message);
+                results.add(ApiResponse.chatResult(message, result));
+            }
+            sendJson(exchange, 200, ApiResponse.chat(results, request.isBatch()));
+        }
+    }
+
+    private final class StatusHandler extends SafeHandler {
+        @Override
+        void handleSafely(HttpExchange exchange) throws IOException {
+            if (!authorize(exchange)) {
+                return;
+            }
+            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                exchange.getResponseHeaders().set("Allow", "GET");
+                sendError(exchange, 405, "Method not allowed - Use GET");
+                return;
+            }
+            boolean inWorld = bridge.isInWorld();
+            sendJson(exchange, 200, ApiResponse.status(config, getHost(), getPort(),
+                    inWorld, inWorld ? bridge.getPlayerName() : null,
+                    modVersion, minecraftVersion));
+        }
+    }
+
+    private final class NotFoundHandler extends SafeHandler {
+        @Override
+        void handleSafely(HttpExchange exchange) throws IOException {
+            sendError(exchange, 404, "Unknown endpoint: " + exchange.getRequestURI().getPath()
+                    + " - try /api/status, /api/chat or /api/execute");
         }
     }
 }
