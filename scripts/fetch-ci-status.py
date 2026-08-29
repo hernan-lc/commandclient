@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Record what GitHub Actions actually verified, into build/ci-status.json.
+"""Record what GitHub Actions actually verified, into ci-status.json.
 
 The documentation generator refuses to claim CI success on its own: it only
 reports a target as CI verified if this file says a real workflow run built it.

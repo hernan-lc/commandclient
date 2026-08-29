@@ -6,7 +6,7 @@ claimed when there is evidence for it:
 
   Configured      the target is declared in versions.json with a module
   Artifact        a JAR exists in the local build manifest
-  CI verified     a real GitHub Actions run built it (build/ci-status.json,
+  CI verified     a real GitHub Actions run built it (ci-status.json,
                   written by scripts/fetch-ci-status.py)
   Runtime verified  someone launched Minecraft and exercised the API
                   (versions.json -> runtimeVerified)
