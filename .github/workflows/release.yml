@@ -18,7 +18,7 @@ jobs:
     name: Build and publish every supported version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Every JDK any target needs to build, taken from versions.json.
       - name: Collect required JDKs
@@ -37,12 +37,12 @@ jobs:
           print("target_count=" + str(len(data["versions"])))
           PY
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: ${{ steps.jdks.outputs.list }}
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Check the tag matches versions.json
         run: |

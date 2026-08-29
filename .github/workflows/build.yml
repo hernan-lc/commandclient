@@ -19,7 +19,7 @@ jobs:
     outputs:
       matrix: ${{ steps.read.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: read
         run: |
           python3 - <<'PY' >> "$GITHUB_OUTPUT"
@@ -47,12 +47,12 @@ jobs:
     name: Shared core tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Unit tests
         run: ./gradlew :common:test
@@ -74,14 +74,14 @@ jobs:
       matrix:
         target: ${{ fromJson(needs.targets.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: ${{ matrix.target.java }}
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Build (${{ matrix.target.buildFamily }} -> ${{ matrix.target.jarTask }})
         run: ./gradlew :${{ matrix.target.module }}:build
@@ -96,7 +96,7 @@ jobs:
           fi
           echo "built $JAR"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: commandapi-mc${{ matrix.target.minecraft }}
           path: versions/${{ matrix.target.id }}/build/libs/${{ matrix.target.artifact }}
@@ -110,7 +110,7 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Report per-target build results
         run: |
@@ -120,7 +120,7 @@ jobs:
           fi
 
       - name: Download every version artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: build/distributions
           pattern: commandapi-mc*
@@ -137,7 +137,7 @@ jobs:
       - name: Check the generated version tables are committed
         run: python3 scripts/generate-version-table.py --check
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: commandapi-all-versions
           path: build/distributions
