@@ -26,20 +26,22 @@ jobs:
           import json
           data = json.load(open("versions.json"))
           mod_version = data["modVersion"]
-          include = [
-              {
+          include = []
+          for key, spec in data["versions"].items():
+              family = data["buildFamilies"][spec["buildFamily"]]
+              include.append({
                   "id": key,
                   "minecraft": spec["minecraft"],
                   "module": spec["module"],
                   "java": str(spec["buildJava"]),
+                  "jarTask": family["productionJarTask"],
+                  "buildFamily": spec["buildFamily"],
                   "artifact": f"commandapi-{mod_version}+mc{spec['minecraft']}.jar",
-              }
-              for key, spec in data["versions"].items()
-          ]
+              })
           print("matrix=" + json.dumps(include))
           PY
       - name: Show targets
-        run: echo '${{ steps.read.outputs.matrix }}'
+        run: echo '${{ steps.read.outputs.matrix }}' | python3 -m json.tool
 
   shared:
     name: Shared core tests
@@ -51,13 +53,17 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew :common:test
+
+      - name: Unit tests
+        run: ./gradlew :common:test
+
       - name: Fail if shared code imports Minecraft or Fabric
         run: |
           if grep -rn "net\.minecraft\|net\.fabricmc" common/src/main/java; then
             echo "::error::common/ must not depend on Minecraft or Fabric APIs"
             exit 1
           fi
+          echo "common/ is free of Minecraft and Fabric imports"
 
   build:
     name: Minecraft ${{ matrix.target.minecraft }}
@@ -77,14 +83,14 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Build
+      - name: Build (${{ matrix.target.buildFamily }} -> ${{ matrix.target.jarTask }})
         run: ./gradlew :${{ matrix.target.module }}:build
 
-      - name: Verify artifact name
+      - name: Verify the production JAR exists with the expected name
         run: |
           JAR="versions/${{ matrix.target.id }}/build/libs/${{ matrix.target.artifact }}"
           if [ ! -f "$JAR" ]; then
-            echo "::error::expected $JAR"
+            echo "::error title=Minecraft ${{ matrix.target.minecraft }}::expected $JAR but it was not produced"
             ls -la "versions/${{ matrix.target.id }}/build/libs" || true
             exit 1
           fi
@@ -99,10 +105,19 @@ jobs:
   aggregate:
     name: Collect and verify
     needs: [targets, build]
+    # Runs even when a target failed, so the report names the version that broke
+    # rather than silently skipping verification.
     if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Report per-target build results
+        run: |
+          echo "Matrix result: ${{ needs.build.result }}"
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            echo "::warning::at least one Minecraft target failed to build; see the matrix jobs above"
+          fi
 
       - name: Download every version artifact
         uses: actions/download-artifact@v4

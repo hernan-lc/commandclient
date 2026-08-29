@@ -79,6 +79,10 @@ def verify_jar(spec, artifact, mod_version, report):
     report.check(depends.get("fabricloader") == f">={spec['loader']}",
                  f"{spec['minecraft']}: fabric.mod.json declares fabricloader "
                  f"{depends.get('fabricloader')!r}, expected '>={spec['loader']}'")
+    # The mod uses only Fabric Loader APIs, so it must not demand Fabric API.
+    report.check("fabric-api" not in depends and "fabric" not in depends,
+                 f"{spec['minecraft']}: fabric.mod.json must not depend on Fabric API "
+                 f"(depends={sorted(depends)})")
     report.check(mod_json.get("entrypoints", {}).get("client") == [ENTRYPOINT],
                  f"{spec['minecraft']}: client entrypoint is "
                  f"{mod_json.get('entrypoints', {}).get('client')!r}")
@@ -104,6 +108,20 @@ def main():
                      f"{key}: missing {module_dir / 'build.gradle'}")
         report.check(spec.get("module") == f"versions:{key}",
                      f"{key}: 'module' should be 'versions:{key}', got {spec.get('module')!r}")
+        report.check(spec.get("buildFamily") in data["buildFamilies"],
+                     f"{key}: unknown buildFamily {spec.get('buildFamily')!r}")
+        report.check(spec.get("adapterFamily") in data["adapterFamilies"]
+                     or spec.get("adapterFamily") == "custom",
+                     f"{key}: unknown adapterFamily {spec.get('adapterFamily')!r}")
+        report.check(spec.get("tier") in data["supportTiers"],
+                     f"{key}: unknown support tier {spec.get('tier')!r}")
+        # The plugin id a module applies is what selects its build family.
+        expected_plugin = data["buildFamilies"].get(spec.get("buildFamily"), {}).get("loomPlugin")
+        build_file = module_dir / "build.gradle"
+        if expected_plugin and build_file.is_file():
+            report.check(f"id '{expected_plugin}'" in build_file.read_text(encoding="utf-8"),
+                         f"{key}: build.gradle should apply plugin id {expected_plugin!r} "
+                         f"for build family {spec['buildFamily']!r}")
 
     if not MANIFEST.is_file():
         print(f"error: {MANIFEST.relative_to(ROOT)} not found. "
@@ -119,6 +137,14 @@ def main():
     for artifact in manifest.get("artifacts", []):
         by_minecraft[artifact["minecraft"]] = artifact
         names.setdefault(artifact["file"], []).append(artifact["minecraft"])
+
+    for artifact in manifest.get("artifacts", []):
+        spec = next((s for s in versions.values() if s["minecraft"] == artifact["minecraft"]), None)
+        if spec:
+            expected_task = data["buildFamilies"][spec["buildFamily"]]["productionJarTask"]
+            report.check(artifact.get("jarTask") == expected_task,
+                         f"{artifact['minecraft']}: manifest says the JAR came from "
+                         f"{artifact.get('jarTask')!r}, expected {expected_task!r}")
 
     for name, owners in names.items():
         report.check(len(owners) == 1,

@@ -34,6 +34,7 @@ jobs:
           print("EOF")
           print("from_env=" + ",".join(f"JAVA_HOME_{jdk}_X64" for jdk in jdks))
           print("mod_version=" + data["modVersion"])
+          print("target_count=" + str(len(data["versions"])))
           PY
 
       - uses: actions/setup-java@v4
@@ -54,7 +55,7 @@ jobs:
 
       # A release must not be published if any configured target fails, so this
       # builds them all in one run rather than a matrix.
-      - name: Build all versions
+      - name: Build all ${{ steps.jdks.outputs.target_count }} versions
         run: ./gradlew buildAllVersions -Porg.gradle.java.installations.fromEnv=${{ steps.jdks.outputs.from_env }}
 
       - name: Verify artifacts against versions.json
@@ -68,8 +69,11 @@ jobs:
             echo "## Command API $TAG"
             echo
             echo "One JAR per supported Minecraft version. Drop the matching file into your \`mods/\` folder."
+            echo "Fabric Loader is required; Fabric API is not."
             echo
-            sed -n '/^| Minecraft /,/^$/p' docs/VERSIONS.md
+            sed -n '/^| Minecraft | Tier /,/^$/p' docs/VERSIONS.md
+            echo "Columns: Artifact = built here, CI = verified by GitHub Actions, Runtime = exercised in game."
+            echo
             echo "\`manifest.json\` lists the same artifacts in machine-readable form."
           } > release-notes.md
           cat release-notes.md

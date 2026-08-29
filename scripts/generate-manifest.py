@@ -44,7 +44,10 @@ def main():
             "minecraft": spec["minecraft"],
             "java": spec["java"],
             "loader": spec["loader"],
-            "fabricApi": spec["fabricApi"],
+            "buildFamily": spec["buildFamily"],
+            "adapterFamily": spec["adapterFamily"],
+            "tier": spec["tier"],
+            "jarTask": data["buildFamilies"][spec["buildFamily"]]["productionJarTask"],
             "file": jar.name,
             "size": jar.stat().st_size,
         })
