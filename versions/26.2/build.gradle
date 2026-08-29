@@ -1,7 +1,7 @@
 // Generated shape: the plugin id selects the build family for this target.
 // Everything else comes from versions.json via the shared script below.
 plugins {
-    id 'fabric-loom'
+    id 'net.fabricmc.fabric-loom'
 }
 
 apply from: rootProject.file('gradle/version-module.gradle')

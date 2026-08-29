@@ -1,42 +1,201 @@
 {
-  "_comment": "Single source of truth for every Minecraft target. settings.gradle, the build, CI and the doc generators all read this file. See docs/ADDING_VERSION.md.",
-  "modVersion": "1.1.0",
+  "_comment": "Authoritative compatibility manifest. settings.gradle, the build, CI, the release workflow and the doc generators all read this file. Nothing here may be duplicated elsewhere. See docs/ADDING_VERSION.md.",
+  "modVersion": "1.2.0",
+  "buildFamilies": {
+    "legacy-remapped": {
+      "description": "Minecraft <= 1.21.11 ships obfuscated, so Loom remaps the mod against official Mojang mappings and the production artifact comes from remapJar.",
+      "loomPlugin": "fabric-loom",
+      "loomVersion": "1.17.20",
+      "mappings": "official-mojang",
+      "modDependencyConfiguration": "modImplementation",
+      "productionJarTask": "remapJar"
+    },
+    "modern-unobfuscated": {
+      "description": "Minecraft >= 26.1 ships unobfuscated (Mojang publishes no client_mappings), so Loom's non-obfuscated pipeline applies: no mappings, plain dependencies, and no remap step at all.",
+      "loomPlugin": "net.fabricmc.fabric-loom",
+      "loomVersion": "1.17.20",
+      "mappings": "none",
+      "modDependencyConfiguration": "implementation",
+      "productionJarTask": "jar"
+    }
+  },
+  "adapterFamilies": {
+    "legacy-chat": {
+      "description": "LocalPlayer.chat(String) sends both chat and commands. Replaced in 1.19 by signed chat.",
+      "sourceDir": "adapters/legacy-chat"
+    },
+    "signed-chat": {
+      "description": "1.19-1.19.2 signed chat: LocalPlayer.chatSigned / commandSigned with a nullable preview component.",
+      "sourceDir": "adapters/signed-chat"
+    },
+    "network-chat": {
+      "description": "1.19.3+ splits sending: ClientPacketListener.sendChat / sendCommand. The same Mojang-mapped names still apply on unobfuscated 26.x, so this family covers both build families.",
+      "sourceDir": "adapters/network-chat"
+    }
+  },
+  "supportTiers": {
+    "A": "Latest stable Minecraft. Supported first after a Minecraft update.",
+    "B": "Current/recent ecosystem versions that mods are actively built for.",
+    "C": "Historical modding anchors with lasting community use.",
+    "D": "Best effort. Kept while it costs nothing; no guarantee for arbitrary patches."
+  },
   "versions": {
-    "1.16.1": {
-      "minecraft": "1.16.1",
-      "loader": "0.11.6",
-      "fabricApi": "0.18.0+build.387-1.16.1",
-      "fabricApiModId": "fabric",
-      "java": 8,
-      "buildJava": 21,
-      "module": "versions:1.16.1"
+    "26.2": {
+      "minecraft": "26.2",
+      "loader": "0.19.5",
+      "java": 25,
+      "buildJava": 25,
+      "buildFamily": "modern-unobfuscated",
+      "adapterFamily": "network-chat",
+      "tier": "A",
+      "runtimeVerified": false,
+      "module": "versions:26.2"
     },
-    "1.19.4": {
-      "minecraft": "1.19.4",
-      "loader": "0.14.21",
-      "fabricApi": "0.87.2+1.19.4",
-      "fabricApiModId": "fabric-api",
-      "java": 17,
-      "buildJava": 21,
-      "module": "versions:1.19.4"
+    "26.1": {
+      "minecraft": "26.1",
+      "loader": "0.19.5",
+      "java": 25,
+      "buildJava": 25,
+      "buildFamily": "modern-unobfuscated",
+      "adapterFamily": "network-chat",
+      "tier": "B",
+      "runtimeVerified": false,
+      "module": "versions:26.1",
+      "notes": "First unobfuscated release; kept as the boundary marker for the modern build family."
     },
-    "1.20.1": {
-      "minecraft": "1.20.1",
-      "loader": "0.14.21",
-      "fabricApi": "0.92.11+1.20.1",
-      "fabricApiModId": "fabric-api",
-      "java": 17,
+    "1.21.11": {
+      "minecraft": "1.21.11",
+      "loader": "0.19.3",
+      "java": 21,
       "buildJava": 21,
-      "module": "versions:1.20.1"
+      "buildFamily": "legacy-remapped",
+      "adapterFamily": "network-chat",
+      "tier": "B",
+      "runtimeVerified": false,
+      "module": "versions:1.21.11",
+      "notes": "Last obfuscated release; the boundary marker for the legacy build family."
+    },
+    "1.21.8": {
+      "minecraft": "1.21.8",
+      "loader": "0.19.3",
+      "java": 21,
+      "buildJava": 21,
+      "buildFamily": "legacy-remapped",
+      "adapterFamily": "network-chat",
+      "tier": "B",
+      "runtimeVerified": false,
+      "module": "versions:1.21.8"
+    },
+    "1.21.4": {
+      "minecraft": "1.21.4",
+      "loader": "0.16.14",
+      "java": 21,
+      "buildJava": 21,
+      "buildFamily": "legacy-remapped",
+      "adapterFamily": "network-chat",
+      "tier": "B",
+      "runtimeVerified": false,
+      "module": "versions:1.21.4"
+    },
+    "1.21.1": {
+      "minecraft": "1.21.1",
+      "loader": "0.16.14",
+      "java": 21,
+      "buildJava": 21,
+      "buildFamily": "legacy-remapped",
+      "adapterFamily": "network-chat",
+      "tier": "B",
+      "runtimeVerified": false,
+      "module": "versions:1.21.1"
+    },
+    "1.20.6": {
+      "minecraft": "1.20.6",
+      "loader": "0.16.14",
+      "java": 21,
+      "buildJava": 21,
+      "buildFamily": "legacy-remapped",
+      "adapterFamily": "network-chat",
+      "tier": "C",
+      "runtimeVerified": false,
+      "module": "versions:1.20.6"
     },
     "1.20.4": {
       "minecraft": "1.20.4",
-      "loader": "0.15.6",
-      "fabricApi": "0.97.3+1.20.4",
-      "fabricApiModId": "fabric-api",
+      "loader": "0.16.14",
       "java": 17,
       "buildJava": 21,
+      "buildFamily": "legacy-remapped",
+      "adapterFamily": "network-chat",
+      "tier": "D",
+      "runtimeVerified": false,
       "module": "versions:1.20.4"
+    },
+    "1.20.1": {
+      "minecraft": "1.20.1",
+      "loader": "0.16.14",
+      "java": 17,
+      "buildJava": 21,
+      "buildFamily": "legacy-remapped",
+      "adapterFamily": "network-chat",
+      "tier": "C",
+      "runtimeVerified": false,
+      "module": "versions:1.20.1"
+    },
+    "1.19.4": {
+      "minecraft": "1.19.4",
+      "loader": "0.16.14",
+      "java": 17,
+      "buildJava": 21,
+      "buildFamily": "legacy-remapped",
+      "adapterFamily": "network-chat",
+      "tier": "D",
+      "runtimeVerified": false,
+      "module": "versions:1.19.4"
+    },
+    "1.19.2": {
+      "minecraft": "1.19.2",
+      "loader": "0.16.14",
+      "java": 17,
+      "buildJava": 21,
+      "buildFamily": "legacy-remapped",
+      "adapterFamily": "signed-chat",
+      "tier": "C",
+      "runtimeVerified": false,
+      "module": "versions:1.19.2"
+    },
+    "1.18.2": {
+      "minecraft": "1.18.2",
+      "loader": "0.16.14",
+      "java": 17,
+      "buildJava": 21,
+      "buildFamily": "legacy-remapped",
+      "adapterFamily": "legacy-chat",
+      "tier": "C",
+      "runtimeVerified": false,
+      "module": "versions:1.18.2"
+    },
+    "1.16.5": {
+      "minecraft": "1.16.5",
+      "loader": "0.14.24",
+      "java": 8,
+      "buildJava": 21,
+      "buildFamily": "legacy-remapped",
+      "adapterFamily": "legacy-chat",
+      "tier": "C",
+      "runtimeVerified": false,
+      "module": "versions:1.16.5",
+      "notes": "Fabric Loader 0.15+ requires Java 17, so Java 8 targets pin the 0.14.x line."
+    },
+    "1.16.1": {
+      "minecraft": "1.16.1",
+      "loader": "0.14.24",
+      "java": 8,
+      "buildJava": 21,
+      "buildFamily": "legacy-remapped",
+      "adapterFamily": "legacy-chat",
+      "tier": "D",
+      "runtimeVerified": false,
+      "module": "versions:1.16.1"
     }
   }
 }

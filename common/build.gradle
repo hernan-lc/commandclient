@@ -11,8 +11,8 @@ plugins {
 
 // Source level of the oldest supported target, so shared code cannot use APIs
 // that would break on Minecraft 1.16.1.
-def oldestJava = rootProject.ext.versionSpecs.values().collect { it.java as int }.min()
-def buildJava = rootProject.ext.versionSpecs.values().collect { it.buildJava as int }.min()
+def oldestJava = rootProject.ext.manifest.versions.values().collect { it.java as int }.min()
+def buildJava = rootProject.ext.manifest.versions.values().collect { it.buildJava as int }.min()
 
 version = rootProject.ext.modVersion
 

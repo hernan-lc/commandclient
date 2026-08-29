@@ -1,37 +1,47 @@
 import groovy.json.JsonSlurper
 
+// versions.json is the single source of truth. It is read here so the module
+// list and the Loom plugin version can never drift from it.
 pluginManagement {
+    def manifest = new JsonSlurper().parse(file('versions.json'))
+    def families = manifest.buildFamilies
+
+    // Both Loom plugin ids resolve to the same artifact, so declaring them
+    // together is classpath-consistent. Which one a module applies is what
+    // selects its build family: 'fabric-loom' drives the obfuscated/remapped
+    // pipeline, 'net.fabricmc.fabric-loom' the unobfuscated one used from 26.1.
+    def loomVersions = families.values().collect { it.loomVersion }.unique()
+    if (loomVersions.size() != 1) {
+        throw new GradleException("All build families must share one Loom version (found ${loomVersions}); " +
+                "Gradle cannot put two versions of the same plugin on one build classpath.")
+    }
+
     repositories {
-        maven {
-            name = 'Fabric'
-            url = 'https://maven.fabricmc.net/'
-        }
-        maven {
-            name = 'Mojang'
-            url = 'https://libraries.minecraft.net/'
-        }
+        maven { url = 'https://maven.fabricmc.net/' }
         gradlePluginPortal()
+    }
+
+    plugins {
+        families.values().collect { it.loomPlugin }.unique().each { pluginId ->
+            id pluginId version loomVersions[0]
+        }
     }
 }
 
 plugins {
-    id 'fabric-loom' version '1.7.4' apply false
+    // Lets Gradle provision a missing JDK toolchain (Java 25 for Minecraft 26.x)
+    // instead of failing on machines that do not have it installed.
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
 }
 
 rootProject.name = 'commandapi'
 
 include 'common'
 
-// versions.json is the single source of truth: every entry becomes a Gradle
-// module at versions/<id>. Adding a Minecraft target needs no change here.
-def versionsFile = file('versions.json')
-def versionSpecs = new JsonSlurper().parse(versionsFile).versions
-
-versionSpecs.each { id, spec ->
+new JsonSlurper().parse(file('versions.json')).versions.each { id, spec ->
     def dir = file("versions/${id}")
     if (!dir.directory) {
-        throw new GradleException("versions.json declares '${id}' but ${dir} does not exist. " +
-                "See docs/ADDING_VERSION.md.")
+        throw new GradleException("versions.json declares '${id}' but ${dir} does not exist. See docs/ADDING_VERSION.md.")
     }
     include "versions:${id}"
     project(":versions:${id}").projectDir = dir

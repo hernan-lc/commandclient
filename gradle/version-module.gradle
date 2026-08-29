@@ -1,0 +1,110 @@
+// Shared build logic for every versions/<minecraft-version> module.
+//
+// A version module owns no Java source and no dependency versions of its own.
+// Everything comes from its entry in versions.json plus the build family and
+// adapter family that entry names, so adding a Minecraft target is a
+// configuration change. See docs/ADDING_VERSION.md.
+
+def manifest = rootProject.ext.manifest
+def spec = manifest.versions[project.name]
+if (spec == null) {
+    throw new GradleException("No entry for '${project.name}' in versions.json. See docs/ADDING_VERSION.md.")
+}
+
+def family = manifest.buildFamilies[spec.buildFamily]
+if (family == null) {
+    throw new GradleException("${project.name}: unknown buildFamily '${spec.buildFamily}'. " +
+            "Known: ${manifest.buildFamilies.keySet()}")
+}
+
+// commandapi-<mod-version>+mc<minecraft-version>.jar
+version = "${manifest.modVersion}+mc${spec.minecraft}"
+base {
+    archivesName = 'commandapi'
+}
+
+repositories {
+    maven { url = 'https://maven.fabricmc.net/' }
+    mavenCentral()
+}
+
+// The families differ in how mods are consumed: the remapped pipeline needs
+// modImplementation so Loom remaps them, while the unobfuscated pipeline takes
+// plain dependencies because there is nothing to remap.
+def modConfiguration = family.modDependencyConfiguration
+
+dependencies {
+    minecraft "com.mojang:minecraft:${spec.minecraft}"
+
+    if (family.mappings == 'official-mojang') {
+        mappings loom.officialMojangMappings()
+    } else if (family.mappings != 'none') {
+        throw new GradleException("${project.name}: unsupported mappings mode '${family.mappings}'")
+    }
+    // 'none' is not an omission: from 26.1 Mojang publishes no mappings at all,
+    // and asking Loom for them in a non-obfuscated environment is an error.
+
+    add(modConfiguration, "net.fabricmc:fabric-loader:${spec.loader}")
+
+    // Minecraft ships Gson; compile against it without bundling it.
+    compileOnly 'com.google.code.gson:gson:2.10.1'
+}
+
+// Shared code: the version independent core, the Fabric entrypoint (identical
+// for every target), and the adapter family for this Minecraft generation.
+sourceSets.main.java.srcDir rootProject.file('common/src/main/java')
+sourceSets.main.java.srcDir rootProject.file('adapters/loader-entrypoint/src/main/java')
+
+if (spec.adapterFamily == 'custom') {
+    // The module supplies its own MinecraftBridgeImpl under versions/<id>/src.
+    if (!file('src/main/java').directory) {
+        throw new GradleException("${project.name} declares adapterFamily 'custom' but has no src/main/java.")
+    }
+} else {
+    def adapter = manifest.adapterFamilies[spec.adapterFamily]
+    if (adapter == null) {
+        throw new GradleException("${project.name}: unknown adapterFamily '${spec.adapterFamily}'. " +
+                "Known: ${manifest.adapterFamilies.keySet()} (or 'custom')")
+    }
+    sourceSets.main.java.srcDir rootProject.file("${adapter.sourceDir}/src/main/java")
+}
+
+// fabric.mod.json is one shared template expanded per target.
+sourceSets.main.resources.srcDir rootProject.file('templates')
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(spec.buildJava as int)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    // Bytecode level this Minecraft version requires, independent of the JDK
+    // that compiles it.
+    options.release = spec.java as int
+}
+
+tasks.named('processResources') {
+    def placeholders = [
+            mod_id           : 'commandapi',
+            mod_version      : project.version.toString(),
+            minecraft_version: spec.minecraft.toString(),
+            loader_version   : spec.loader.toString(),
+            java_version     : spec.java.toString()
+    ]
+    inputs.properties placeholders
+    filesMatching('fabric.mod.json') {
+        expand placeholders
+    }
+}
+
+// Which task produces the shippable JAR is family specific: the remapped
+// pipeline ships remapJar, the unobfuscated one has no remap step at all and
+// ships jar. Expose it so the root project never has to assume.
+ext.productionJarTask = family.productionJarTask
+tasks.register('productionJar') {
+    group = 'build'
+    description = "Alias for this module's production JAR task (${family.productionJarTask})."
+    dependsOn family.productionJarTask
+}

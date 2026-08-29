@@ -1,48 +1,63 @@
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 
-// ---------------------------------------------------------------------------
-// versions.json drives everything: module list, dependency versions, Java
-// levels, artifact names, generated metadata, CI matrix and docs.
-// ---------------------------------------------------------------------------
-def versionsJson = new JsonSlurper().parse(file('versions.json'))
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
-// Read by common/build.gradle and gradle/fabric-version-module.gradle.
+// ---------------------------------------------------------------------------
+// versions.json drives everything: module list, build families, dependency
+// versions, Java levels, artifact names, generated metadata, CI matrix, docs.
+// ---------------------------------------------------------------------------
+def manifestJson = new JsonSlurper().parse(file('versions.json'))
+
+// Read by common/build.gradle and gradle/version-module.gradle.
 ext {
-    modVersion = versionsJson.modVersion
-    versionSpecs = versionsJson.versions
+    manifest = manifestJson
+    modVersion = manifestJson.modVersion
 }
 
 allprojects {
     group = 'com.commandapi'
 }
 
-// Captured as locals: task configuration blocks do not see the project's extra
-// properties through a bare `ext`.
-def specs = versionsJson.versions
-def modVersionValue = versionsJson.modVersion
+def specs = manifestJson.versions
+def families = manifestJson.buildFamilies
+def modVersionValue = manifestJson.modVersion
 def outputDir = layout.buildDirectory.dir('distributions')
 
-/** The version modules, in versions.json order. */
 def versionProjects = { specs.keySet().collect { project(":versions:${it}") } }
 
-/** Artifact file name for a target, e.g. commandapi-1.1.0+mc1.16.1.jar */
+/** Artifact file name for a target, e.g. commandapi-1.2.0+mc26.2.jar */
 def artifactNameOf = { String minecraft -> "commandapi-${modVersionValue}+mc${minecraft}.jar" }
+
+/**
+ * The task that produces a target's shippable JAR. Legacy targets ship
+ * remapJar; unobfuscated 26.x targets have no remap step and ship jar.
+ */
+def productionJarTaskOf = { String id -> families[specs[id].buildFamily].productionJarTask }
 
 tasks.register('collectArtifacts') {
     group = 'build'
-    description = 'Copies every remapped production JAR into build/distributions and writes manifest.json.'
+    description = 'Copies every production JAR into build/distributions and writes manifest.json.'
 
-    dependsOn versionProjects().collect { "${it.path}:remapJar" }
+    dependsOn specs.keySet().collect { ":versions:${it}:${productionJarTaskOf(it)}" }
 
     doLast {
         def target = outputDir.get().asFile
         target.mkdirs()
 
+        // Clear stale artifacts so a renamed or removed target cannot linger
+        // here and end up in a release.
+        target.listFiles()?.each { existing ->
+            if (existing.file && (existing.name.endsWith('.jar') || existing.name == 'manifest.json')) {
+                existing.delete()
+            }
+        }
+
         def artifacts = []
         specs.each { id, spec ->
-            def remapJar = project(":versions:${id}").tasks.named('remapJar').get()
-            def source = remapJar.archiveFile.get().asFile
+            def jarTask = project(":versions:${id}").tasks.named(productionJarTaskOf(id)).get()
+            def source = jarTask.archiveFile.get().asFile
             if (!source.exists()) {
                 throw new GradleException("Minecraft ${spec.minecraft}: expected ${source} but it was not produced.")
             }
@@ -50,28 +65,29 @@ tasks.register('collectArtifacts') {
             if (source.name != expected) {
                 throw new GradleException("Minecraft ${spec.minecraft}: produced ${source.name}, expected ${expected}.")
             }
-            copy {
-                from source
-                into target
-            }
+            Files.copy(source.toPath(), new File(target, expected).toPath(),
+                    StandardCopyOption.REPLACE_EXISTING)
             artifacts << [
-                    minecraft : spec.minecraft,
-                    java      : spec.java,
-                    loader    : spec.loader,
-                    fabricApi : spec.fabricApi,
-                    file      : expected,
-                    size      : source.length()
+                    minecraft    : spec.minecraft,
+                    java         : spec.java,
+                    loader       : spec.loader,
+                    buildFamily  : spec.buildFamily,
+                    adapterFamily: spec.adapterFamily,
+                    tier         : spec.tier,
+                    jarTask      : productionJarTaskOf(id),
+                    file         : expected,
+                    size         : source.length()
             ]
         }
 
-        def manifest = [
+        def buildManifest = [
                 modVersion: modVersionValue,
                 generated : new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
                 artifacts : artifacts
         ]
-        new File(target, 'manifest.json').text = JsonOutput.prettyPrint(JsonOutput.toJson(manifest)) + '\n'
+        new File(target, 'manifest.json').text = JsonOutput.prettyPrint(JsonOutput.toJson(buildManifest)) + '\n'
 
-        artifacts.each { println "Minecraft ${it.minecraft} ... SUCCESS" }
+        artifacts.each { println "Minecraft ${it.minecraft} (${it.buildFamily}) ... SUCCESS" }
         println "\nArtifacts:"
         artifacts.each { println "  ${target}/${it.file}" }
     }
@@ -93,8 +109,7 @@ tasks.register('buildAllVersions') {
 
 tasks.register('versionTable', Exec) {
     group = 'documentation'
-    description = 'Regenerates docs/VERSIONS.md and the README version table from versions.json + manifest.json.'
-    // The tables must describe artifacts the build actually produced.
+    description = 'Regenerates docs/VERSIONS.md and the README table from versions.json + the build manifest.'
     dependsOn 'collectArtifacts'
     commandLine 'python3', file('scripts/generate-version-table.py').absolutePath
     workingDir projectDir
@@ -112,8 +127,10 @@ tasks.register('printVersions') {
     group = 'help'
     description = 'Prints the configured Minecraft targets.'
     doLast {
+        printf("%-9s %-6s %-8s %-9s %-22s %s%n", 'MC', 'TIER', 'JAVA', 'LOADER', 'BUILD FAMILY', 'ADAPTER')
         specs.each { id, spec ->
-            println "${id}\tjava=${spec.java}\tloader=${spec.loader}\tfabric-api=${spec.fabricApi}\tmodule=:${spec.module}"
+            printf("%-9s %-6s %-8s %-9s %-22s %s%n", id, spec.tier, spec.java, spec.loader,
+                    spec.buildFamily, spec.adapterFamily)
         }
     }
 }
