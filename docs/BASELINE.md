@@ -1,7 +1,9 @@
-# Pre-refactor baseline report
+# Baseline report (pre-refactor, historical)
 
-Recorded before the multi-version refactor, against commit `d6c4e58` (single
-Gradle project, sources in `src/main/java/com/commandapi`).
+Recorded before the first multi-version refactor, against commit `d6c4e58`
+(single Gradle project, sources in `src/main/java/com/commandapi`). Kept as
+history: it explains why several decisions were made. It does **not** describe
+the current build — see [BUILD.md](BUILD.md) and [VERSIONS.md](VERSIONS.md).
 
 Environment: Linux, Gradle 8.10.2, Fabric Loom 1.7.4, JDK 21 (the repo's
 `gradle/wrapper/gradle-wrapper.jar` was missing and had to be regenerated).

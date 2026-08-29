@@ -101,26 +101,47 @@ HTTP status stays `200` and the failing entry carries `"success": false`.
 
 ### When you are not in a world
 
+The request is answered with **HTTP 503** and nothing is sent. The body keeps
+the normal shape so existing clients can still read `result` / `results`:
+
 ```json
 {
   "result": { "text": "hello", "success": false, "output": "Player not available (not in world?)" },
-  "success": true
+  "success": false,
+  "error": "Player not available (not in world?)"
 }
 ```
+
+Earlier versions returned `200` here. Check the status code if you care about
+the difference between "sent" and "could not send".
 
 ## `POST /api/execute`
 
 Alias of `/api/chat`, kept so existing clients keep working. Same request and
 response format.
 
+## Limits
+
+| Limit | Value | Exceeded gives |
+|---|---|---|
+| Request body | 64 KiB | `413` |
+| Messages per batch | 32 | `400` |
+| Message length | 256 characters (Minecraft's own chat limit) | `400` |
+
 ## Errors
 
 | Status | When |
 |---|---|
-| `400` | body is not a JSON object, or has no usable `text` / `messages` field |
+| `400` | body is not a JSON object, has no usable `text` / `messages` field, or breaks a limit |
 | `401` | authentication enabled and the Bearer token is missing or wrong |
-| `405` | `/api/chat` or `/api/execute` called with a method other than POST |
+| `404` | unknown endpoint |
+| `405` | wrong method (`/api/chat` is POST only, `/api/status` GET only); the response carries an `Allow` header |
+| `413` | request body over 64 KiB |
+| `503` | no player available — you are not in a world, so nothing was sent |
 | `500` | unexpected failure while handling the request |
+
+No request can kill a worker thread: every handler answers, even on an
+unexpected error.
 
 ```json
 { "error": "Missing 'text' or 'messages' field", "status": 400 }
