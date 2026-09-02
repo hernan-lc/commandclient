@@ -1,10 +1,12 @@
 package com.commandapi.config;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,7 +22,16 @@ public final class ConfigLoader {
 
     public static final String CONFIG_FILE_NAME = "commandapi.json";
 
+    /**
+     * Written next to the config file on every successful start with the
+     * address that was actually bound. This is how external tools find the
+     * server when the port is ephemeral (the default): read this file instead
+     * of assuming a fixed port.
+     */
+    public static final String ADDRESS_FILE_NAME = "commandapi-address.json";
+
     private static final Gson GSON = new Gson();
+    private static final Gson PRETTY_GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private ConfigLoader() {
     }
@@ -41,43 +52,125 @@ public final class ConfigLoader {
         return fromJson(json);
     }
 
-    /** file value > system property > default, per field. */
+    /** file value > system property > default, per field. Never throws. */
     public static ApiConfig fromJson(JsonObject json) {
-        return new ApiConfig(
-                string(json, "host", "api.host", ApiConfig.DEFAULT_HOST),
-                integer(json, "port", "api.port", ApiConfig.DEFAULT_PORT),
-                string(json, "token", "api.token", ""),
-                bool(json, "authEnabled", "api.auth.enabled", false));
+        String host = string(json, "host", "api.host", ApiConfig.DEFAULT_HOST);
+        int port = integer(json, "port", "api.port", ApiConfig.DEFAULT_PORT);
+        String token = string(json, "token", "api.token", "");
+        boolean authEnabled = bool(json, "authEnabled", "api.auth.enabled", false);
+        return new ApiConfig(host, port, token, authEnabled);
     }
 
-    /** Parses a config document from raw JSON text. */
+    /** Parses a config document from raw JSON text. Never throws. */
     public static ApiConfig parse(String jsonText) {
-        return fromJson(GSON.fromJson(jsonText, JsonObject.class));
+        try {
+            return fromJson(GSON.fromJson(jsonText, JsonObject.class));
+        } catch (RuntimeException e) {
+            System.err.println("[CommandAPI] Failed to parse config, using defaults: " + e.getMessage());
+            return ApiConfig.defaults();
+        }
+    }
+
+    /**
+     * Persists the config to {@code <configDir>/commandapi.json}, creating the
+     * directory when needed. Used by the in-game {@code /commandapi} commands
+     * so a change survives restarts. Best effort: failures are logged and
+     * reported via the return value, never thrown.
+     *
+     * @return true when the file was written.
+     */
+    public static boolean save(Path configDir, ApiConfig config) {
+        if (configDir == null || config == null) {
+            return false;
+        }
+        try {
+            Files.createDirectories(configDir);
+            JsonObject json = new JsonObject();
+            json.addProperty("host", config.getHost());
+            json.addProperty("port", config.getPort());
+            json.addProperty("token", config.getToken());
+            json.addProperty("authEnabled", config.isAuthEnabled());
+            Path configPath = configDir.resolve(CONFIG_FILE_NAME);
+            try (Writer writer = Files.newBufferedWriter(configPath, StandardCharsets.UTF_8)) {
+                PRETTY_GSON.toJson(json, writer);
+            }
+            return true;
+        } catch (IOException | RuntimeException e) {
+            System.err.println("[CommandAPI] Failed to write config: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Records the address that was actually bound, for ephemeral-port
+     * discovery. Best effort: failures are logged, never thrown.
+     */
+    public static void writeAddress(Path configDir, String host, int port) {
+        if (configDir == null) {
+            return;
+        }
+        try {
+            Files.createDirectories(configDir);
+            JsonObject json = new JsonObject();
+            json.addProperty("host", host);
+            json.addProperty("port", port);
+            json.addProperty("url", "http://" + host + ":" + port);
+            Path addressPath = configDir.resolve(ADDRESS_FILE_NAME);
+            try (Writer writer = Files.newBufferedWriter(addressPath, StandardCharsets.UTF_8)) {
+                PRETTY_GSON.toJson(json, writer);
+            }
+        } catch (IOException | RuntimeException e) {
+            System.err.println("[CommandAPI] Failed to write " + ADDRESS_FILE_NAME + ": " + e.getMessage());
+        }
+    }
+
+    /** Removes a stale address file, e.g. when the server stops. Best effort. */
+    public static void deleteAddress(Path configDir) {
+        if (configDir == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(configDir.resolve(ADDRESS_FILE_NAME));
+        } catch (IOException | RuntimeException e) {
+            System.err.println("[CommandAPI] Failed to delete " + ADDRESS_FILE_NAME + ": " + e.getMessage());
+        }
     }
 
     private static String string(JsonObject json, String key, String property, String fallback) {
-        if (has(json, key)) {
-            return json.get(key).getAsString();
+        try {
+            if (has(json, key)) {
+                return json.get(key).getAsString();
+            }
+            return System.getProperty(property, fallback);
+        } catch (RuntimeException e) {
+            System.err.println("[CommandAPI] Invalid value for \"" + key + "\", using default: " + e.getMessage());
+            return fallback;
         }
-        return System.getProperty(property, fallback);
     }
 
     private static int integer(JsonObject json, String key, String property, int fallback) {
-        if (has(json, key)) {
-            return json.get(key).getAsInt();
-        }
         try {
-            return Integer.parseInt(System.getProperty(property, String.valueOf(fallback)));
-        } catch (NumberFormatException e) {
+            if (has(json, key)) {
+                return ApiConfig.normalizePort(json.get(key).getAsInt());
+            }
+            return ApiConfig.normalizePort(
+                    Integer.parseInt(System.getProperty(property, String.valueOf(fallback))));
+        } catch (RuntimeException e) {
+            System.err.println("[CommandAPI] Invalid value for \"" + key + "\", using default: " + e.getMessage());
             return fallback;
         }
     }
 
     private static boolean bool(JsonObject json, String key, String property, boolean fallback) {
-        if (has(json, key)) {
-            return json.get(key).getAsBoolean();
+        try {
+            if (has(json, key)) {
+                return json.get(key).getAsBoolean();
+            }
+            return Boolean.parseBoolean(System.getProperty(property, String.valueOf(fallback)));
+        } catch (RuntimeException e) {
+            System.err.println("[CommandAPI] Invalid value for \"" + key + "\", using default: " + e.getMessage());
+            return fallback;
         }
-        return Boolean.parseBoolean(System.getProperty(property, String.valueOf(fallback)));
     }
 
     private static boolean has(JsonObject json, String key) {

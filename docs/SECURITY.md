@@ -9,9 +9,17 @@ or server you are on. Treat the port like a remote control for your player.
 | Setting | Default | Why |
 |---|---|---|
 | `host` | `127.0.0.1` | Only this machine can connect. |
-| `port` | `8080` | — |
+| `port` | `0` (automatic) | The OS picks a free port per start; nothing assumes a fixed one. |
 | `authEnabled` | `false` | Safe *only* because the default bind is loopback. |
 | `token` | empty | — |
+
+## In-game commands
+
+`/commandapi ...` runs with your privileges by construction: it is typed at
+your keyboard, answered inside your client, and never touches the network. No
+token is needed (or accepted) there. The same caution as hand-editing the file
+applies — `/commandapi host 0.0.0.0` exposes you, and the command tells you so
+unless auth is on.
 
 The API is never exposed to the network unless you change `host` yourself.
 
@@ -55,7 +63,7 @@ What was reviewed and what the code does:
 | Unknown paths | JSON 404 from a catch-all handler instead of an empty response. |
 | Uncaught exceptions | Every handler is wrapped: the client always gets a response and a worker thread can never die silently. |
 | Disconnected clients | A broken pipe while writing is logged, not rethrown. |
-| Concurrency | Handlers are stateless; the only shared state is the immutable config and the bridge. |
+| Concurrency | Handlers are stateless; the only shared state is the config and the bridge. The config reference is swapped only while the server is stopped for a restart, and every service method is synchronized. |
 | Client thread | All Minecraft mutation is scheduled onto the client thread with a 5 s timeout (see below). |
 | Shutdown | `stop()` is idempotent, releases the port, and a JVM shutdown hook runs it if the client exits first. Worker threads are daemons. |
 

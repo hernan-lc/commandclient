@@ -10,13 +10,19 @@ import net.fabricmc.loader.api.FabricLoader;
  * <p>All it does is hand the shared {@link CommandApiService} a config
  * directory and this version's {@link MinecraftBridgeImpl}; the API itself is
  * version independent.</p>
+ *
+ * <p>The instance is also published statically so the {@code /commandapi}
+ * chat mixins (which cannot receive injections) can reach the service.</p>
  */
 public class CommandApiMod implements ClientModInitializer {
+
+    private static CommandApiMod instance;
 
     private CommandApiService service;
 
     @Override
     public void onInitializeClient() {
+        instance = this;
         service = new CommandApiService(
                 FabricLoader.getInstance().getConfigDir(),
                 new MinecraftBridgeImpl(),
@@ -30,6 +36,11 @@ public class CommandApiMod implements ClientModInitializer {
                 .getModContainer(modId)
                 .map(container -> container.getMetadata().getVersion().getFriendlyString())
                 .orElse("unknown");
+    }
+
+    /** The live mod instance, or null before {@link #onInitializeClient}. */
+    public static CommandApiMod getInstance() {
+        return instance;
     }
 
     public CommandApiService getService() {

@@ -48,38 +48,51 @@ build families, so both need a runtime check.
 
 ### Steps
 
+The port is automatic by default, so resolve it once per session from the
+address file (paths below use your launcher's `config/` dir):
+
+```bash
+export PORT=$(python3 -c "import json; print(json.load(open('config/commandapi-address.json'))['port'])")
+```
+
 1. **Install** the matching JAR plus Fabric Loader into a clean profile. Do not
    install Fabric API — the mod must work without it.
-2. **Start Minecraft.** The log shows `[CommandAPI] Listening on http://127.0.0.1:8080`.
-   Failure here usually means the entrypoint or `fabric.mod.json` is wrong.
+2. **Start Minecraft.** The log shows `[CommandAPI] Listening on http://127.0.0.1:<port>`
+   and `config/commandapi-address.json` contains the same address. Failure here
+   usually means the entrypoint or `fabric.mod.json` is wrong.
 3. **Before joining a world**, check the offline path:
    ```bash
-   curl -s http://127.0.0.1:8080/api/status            # in_world: false
+   curl -s http://127.0.0.1:$PORT/api/status            # in_world: false
    curl -s -o /dev/null -w '%{http_code}\n' \
-        -X POST http://127.0.0.1:8080/api/chat -d '{"text":"hi"}'   # 503
+        -X POST http://127.0.0.1:$PORT/api/chat -d '{"text":"hi"}'   # 503
    ```
 4. **Join a world or server**, then:
    ```bash
-   curl -s http://127.0.0.1:8080/api/status            # in_world: true, player_name set
+   curl -s http://127.0.0.1:$PORT/api/status            # in_world: true, player_name set
    ```
 5. **Send a chat message** and confirm it appears in the chat as your player:
    ```bash
-   curl -s -X POST http://127.0.0.1:8080/api/chat -d '{"text":"runtime check"}'
+   curl -s -X POST http://127.0.0.1:$PORT/api/chat -d '{"text":"runtime check"}'
    ```
 6. **Send a command** and confirm it executes:
    ```bash
-   curl -s -X POST http://127.0.0.1:8080/api/chat -d '{"text":"/time set day"}'
+   curl -s -X POST http://127.0.0.1:$PORT/api/chat -d '{"text":"/time set day"}'
    ```
 7. **Send a batch** and confirm ordering:
    ```bash
-   curl -s -X POST http://127.0.0.1:8080/api/chat -d '{"messages":["one","two"]}'
+   curl -s -X POST http://127.0.0.1:$PORT/api/chat -d '{"messages":["one","two"]}'
    ```
-8. **Disconnect** back to the main menu, repeat step 3 (must be 503 again, not a
+8. **In-game commands**: type `/commandapi status` (answered locally, nothing
+   reaches the server), then `/commandapi port 0` and confirm the new address
+   in chat matches a fresh `GET /api/status`. This exercises the generation's
+   mixin.
+9. **Disconnect** back to the main menu, repeat step 3 (must be 503 again, not a
    crash), then **reconnect** and repeat step 5. This catches adapters that
    cache a stale player or connection.
-9. **Close Minecraft** and confirm the port is free:
+10. **Close Minecraft** and confirm the port is free and the address file is gone:
    ```bash
-   ss -ltn | grep 8080 || echo "port released"
+   ss -ltn | grep $PORT || echo "port released"
+   ls config/commandapi-address.json || echo "address file removed"
    ```
 
 ### Recording the result

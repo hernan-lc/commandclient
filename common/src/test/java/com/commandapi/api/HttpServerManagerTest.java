@@ -204,6 +204,21 @@ class HttpServerManagerTest {
     }
 
     @Test
+    void ephemeralPortResolvesToARealPort() throws IOException {
+        bridge = new FakeBridge();
+        server = new HttpServerManager(
+                new ApiConfig("127.0.0.1", 0, "", false), bridge, "1.2.0", "test");
+        assertTrue(server.start(), "server should bind an ephemeral port");
+        assertTrue(server.getPort() > 0);
+        port = server.getPort();
+
+        Response response = call("/api/status", "GET", null, null);
+        assertEquals(200, response.status);
+        assertEquals(server.getPort(), response.body.get("port").getAsInt());
+        assertTrue(response.body.get("url").getAsString().endsWith(":" + server.getPort()));
+    }
+
+    @Test
     void stopReleasesThePortAndIsIdempotent() throws IOException {
         start(false, "");
         server.stop();

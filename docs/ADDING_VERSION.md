@@ -94,6 +94,15 @@ register it under `adapterFamilies` in `versions.json`, and point the version at
 it. For a one-off quirk, set `"adapterFamily": "custom"` and put the class in
 `versions/<id>/src/main/java/`.
 
+A new or custom family must also keep the `/commandapi` chat commands working:
+add a mixin that intercepts the generation's outgoing command path and calls
+`CommandApiCommands.dispatchCommand` (or `dispatchChat` when the slash is still
+attached), cancelling the send when it returns true — see the three existing
+mixins. Ship its config as `commandapi.mixins.json`: for built-in families that
+means `adapters/<family>/src/main/resources/commandapi.mixins.json` (picked up
+automatically); for `custom` put it in `versions/<id>/src/main/resources`.
+`fabric.mod.json` already lists that file name, and Loom generates the refmap.
+
 Never branch on a Minecraft version string in shared code — the module you are
 in *is* the branch.
 

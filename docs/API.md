@@ -5,7 +5,12 @@ Minecraft client and acts as your player: it sends chat messages and commands
 exactly as if you had typed them. It cannot administrate a dedicated server,
 read the player list or stop a server.
 
-Base URL (default): `http://127.0.0.1:8080`
+Base URL: `http://127.0.0.1:<port>` — the port is automatic by default
+(`"port": 0` in `config/commandapi.json`), so read it from the game log or
+from `config/commandapi-address.json` (rewritten on every start with the bound
+`host`, `port` and `url`). The examples below use port `8080` as a placeholder;
+substitute your bound port. To pin a fixed port, set `"port"` explicitly or run
+`/commandapi port <n>` in game.
 
 ## Authentication
 
@@ -119,6 +124,24 @@ the difference between "sent" and "could not send".
 
 Alias of `/api/chat`, kept so existing clients keep working. Same request and
 response format.
+
+## In-game commands
+
+Type `/commandapi ...` in chat to inspect and change the config without leaving
+the game. These lines are intercepted client-side: they are answered locally
+and never sent to the server. Every change is written to `commandapi.json` and
+the server restarts on it at once.
+
+| Command | Effect |
+|---|---|
+| `/commandapi` or `/commandapi help` | Usage |
+| `/commandapi status` | Bound address, effective config, running state |
+| `/commandapi port <0-65535>` | `0` picks a free port; a taken port keeps the old config |
+| `/commandapi host <address>` | Change the bind address (warns when exposed without auth) |
+| `/commandapi auth <on\|off>` | Turning on requires a token first |
+| `/commandapi token <secret\|clear>` | Setting a token enables auth; `clear` disables auth too |
+| `/commandapi reload` | Re-read `commandapi.json` from disk and restart |
+| `/commandapi restart` | Restart on the current config |
 
 ## Limits
 

@@ -1,7 +1,26 @@
 // Minimal Command API client.
 // Run with: node docs/example.js "hello world"
+//
+// The port is automatic by default, so the client reads it from the address
+// file the mod rewrites on every start (override with COMMANDAPI_URL, and
+// point at another launcher profile with COMMANDAPI_CONFIG).
 
-const BASE_URL = process.env.COMMANDAPI_URL || 'http://127.0.0.1:8080';
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+function addressFromFile() {
+  const dir = process.env.COMMANDAPI_CONFIG
+    || path.join(os.homedir(), '.minecraft', 'config');
+  try {
+    return JSON.parse(
+      fs.readFileSync(path.join(dir, 'commandapi-address.json'), 'utf8')).url;
+  } catch (error) {
+    return null;
+  }
+}
+
+const BASE_URL = process.env.COMMANDAPI_URL || addressFromFile() || 'http://127.0.0.1:8080';
 const TOKEN = process.env.COMMANDAPI_TOKEN || null; // needed only when authEnabled is true
 
 function headers() {

@@ -29,6 +29,8 @@ through the current 26.x releases: shared HTTP, config and API code lives in
 - **Status endpoint** reporting the API, the Minecraft version and the current player.
 - **Bearer-token authentication**, off by default for a loopback-only server.
 - **Loopback by default**; exposing the API to the network is opt-in and warned about.
+- **Ephemeral port by default** (`port: 0`); the OS picks a free port so instances never collide.
+- **In-game config commands**: `/commandapi status`, `/commandapi port`, `/commandapi host`, `/commandapi auth`, `/commandapi token`, `/commandapi reload`.
 - **Multi-version builds** from one source tree, one JAR per Minecraft version.
 - **No Fabric API required** — only Fabric Loader.
 
@@ -85,18 +87,36 @@ Adding a version is a configuration change, so keeping up is cheap — see
 2. Download the JAR matching your Minecraft version:
    `commandapi-<mod-version>+mc<minecraft-version>.jar`.
 3. Drop it into your `mods/` folder.
-4. Launch the client. The log shows `[CommandAPI] Listening on http://127.0.0.1:8080`.
+4. Launch the client. The log shows `[CommandAPI] Listening on http://127.0.0.1:<port>`
+   with an automatically picked free port (see [Finding your port](#finding-your-port)).
 
 Java requirements follow Minecraft's own: Java 8 for 1.16.x, 17 for 1.18–1.20.4,
 21 for 1.20.6–1.21.x, 25 for 26.x. If Minecraft runs, the mod runs.
 
+## Finding your port
+
+The default config uses `"port": 0`, so the OS assigns a free port on every
+start — two clients (or a leftover process) can never fight over one. Find the
+bound address in any of these places:
+
+- the game log: `[CommandAPI] Listening on http://127.0.0.1:51234`
+- `GET /api/status` (once you know the port): the `port` / `url` fields
+- `<minecraft>/config/commandapi-address.json`, rewritten on every start:
+  `{"host": "127.0.0.1", "port": 51234, "url": "http://127.0.0.1:51234"}`
+
+Set an explicit `"port"` in `commandapi.json` only when a fixed address
+matters to you.
+
 ## Quick start
 
 ```bash
-curl http://127.0.0.1:8080/api/status
-curl -X POST http://127.0.0.1:8080/api/chat -d '{"text":"hello world"}'
-curl -X POST http://127.0.0.1:8080/api/chat -d '{"text":"/time set day"}'
-curl -X POST http://127.0.0.1:8080/api/chat -d '{"messages":["one","two"]}'
+# 1. Find the port (see above); it changes on every start by default.
+cat ~/.minecraft/config/commandapi-address.json
+# 2. Talk to the API (replace 51234 with your port).
+curl http://127.0.0.1:51234/api/status
+curl -X POST http://127.0.0.1:51234/api/chat -d '{"text":"hello world"}'
+curl -X POST http://127.0.0.1:51234/api/chat -d '{"text":"/time set day"}'
+curl -X POST http://127.0.0.1:51234/api/chat -d '{"messages":["one","two"]}'
 ```
 
 | Endpoint | Method | Description |
@@ -113,16 +133,33 @@ Runtime settings live in `<minecraft>/config/commandapi.json`:
 
 ```json
 {
-  "port": 8080,
+  "port": 0,
   "host": "127.0.0.1",
   "token": "",
   "authEnabled": false
 }
 ```
 
-An example is in [`config/commandapi.json`](config/commandapi.json). Binding to
-anything other than loopback lets other machines send chat and commands as you —
-enable authentication if you do.
+`"port": 0` means automatic: the OS picks a free port each start. An example is
+in [`config/commandapi.json`](config/commandapi.json). Binding to anything
+other than loopback lets other machines send chat and commands as you — enable
+authentication if you do.
+
+### In-game commands
+
+Type these in chat (they never leave your client). Every change is saved to
+`commandapi.json` and applied immediately:
+
+| Command | What it does |
+|---|---|
+| `/commandapi help` | List the commands |
+| `/commandapi status` | Show the bound address, config and state |
+| `/commandapi port <0-65535>` | `0` = automatic; anything else binds that port |
+| `/commandapi host <address>` | Default `127.0.0.1`; warns when exposed without auth |
+| `/commandapi auth <on\|off>` | Needs a token first to turn on |
+| `/commandapi token <secret\|clear>` | Setting a token enables auth; clearing disables it |
+| `/commandapi reload` | Re-read `commandapi.json` (for hand edits) and restart |
+| `/commandapi restart` | Restart the server on the current config |
 
 ## Build
 

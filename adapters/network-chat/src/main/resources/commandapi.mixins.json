@@ -1,0 +1,11 @@
+{
+  "required": true,
+  "package": "com.commandapi.version.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "client": [
+    "CommandApiSendCommandMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

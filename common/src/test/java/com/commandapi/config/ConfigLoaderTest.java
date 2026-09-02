@@ -18,7 +18,8 @@ class ConfigLoaderTest {
     void defaultsToLoopbackWithoutAuth() {
         ApiConfig config = ConfigLoader.load(null);
         assertEquals("127.0.0.1", config.getHost());
-        assertEquals(8080, config.getPort());
+        assertEquals(0, config.getPort());
+        assertTrue(config.isEphemeral());
         assertEquals("", config.getToken());
         assertFalse(config.isAuthEnabled());
         assertFalse(config.isExposedBeyondLoopback());
@@ -48,13 +49,48 @@ class ConfigLoaderTest {
 
     @Test
     void missingFileFallsBackToDefaults(@TempDir Path dir) {
-        assertEquals(8080, ConfigLoader.load(dir).getPort());
+        assertEquals(0, ConfigLoader.load(dir).getPort());
     }
 
     @Test
     void malformedFileFallsBackToDefaults(@TempDir Path dir) throws IOException {
         Files.write(dir.resolve(ConfigLoader.CONFIG_FILE_NAME), "{not json".getBytes(StandardCharsets.UTF_8));
-        assertEquals(8080, ConfigLoader.load(dir).getPort());
+        assertEquals(0, ConfigLoader.load(dir).getPort());
+    }
+
+    @Test
+    void outOfRangePortFallsBackToEphemeral() {
+        assertEquals(0, ConfigLoader.parse("{\"port\":99999}").getPort());
+        assertEquals(0, ConfigLoader.parse("{\"port\":-1}").getPort());
+        assertEquals(1234, ConfigLoader.parse("{\"port\":1234}").getPort());
+    }
+
+    @Test
+    void wrongTypePortFallsBackToDefault() {
+        assertEquals(0, ConfigLoader.parse("{\"port\":\"abc\"}").getPort());
+        assertEquals(0, ConfigLoader.parse("{\"port\":true}").getPort());
+    }
+
+    @Test
+    void saveRoundTrips(@TempDir Path dir) {
+        assertTrue(ConfigLoader.save(dir, new ApiConfig("0.0.0.0", 9123, "s3cret", true)));
+        ApiConfig reloaded = ConfigLoader.load(dir);
+        assertEquals("0.0.0.0", reloaded.getHost());
+        assertEquals(9123, reloaded.getPort());
+        assertEquals("s3cret", reloaded.getToken());
+        assertTrue(reloaded.isAuthEnabled());
+    }
+
+    @Test
+    void addressFileRoundTrips(@TempDir Path dir) throws IOException {
+        ConfigLoader.writeAddress(dir, "127.0.0.1", 51234);
+        Path address = dir.resolve(ConfigLoader.ADDRESS_FILE_NAME);
+        assertTrue(Files.isRegularFile(address));
+        String body = new String(Files.readAllBytes(address), StandardCharsets.UTF_8);
+        assertTrue(body.contains("51234"));
+        assertTrue(body.contains("http://127.0.0.1:51234"));
+        ConfigLoader.deleteAddress(dir);
+        assertFalse(Files.exists(address));
     }
 
     @Test

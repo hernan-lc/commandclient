@@ -56,7 +56,9 @@ sourceSets.main.java.srcDir rootProject.file('common/src/main/java')
 sourceSets.main.java.srcDir rootProject.file('adapters/loader-entrypoint/src/main/java')
 
 if (spec.adapterFamily == 'custom') {
-    // The module supplies its own MinecraftBridgeImpl under versions/<id>/src.
+    // The module supplies its own MinecraftBridgeImpl under versions/<id>/src,
+    // plus its own commandapi.mixins.json under versions/<id>/src/main/resources
+    // (picked up as a standard resource dir) when it needs chat commands.
     if (!file('src/main/java').directory) {
         throw new GradleException("${project.name} declares adapterFamily 'custom' but has no src/main/java.")
     }
@@ -67,6 +69,13 @@ if (spec.adapterFamily == 'custom') {
                 "Known: ${manifest.adapterFamilies.keySet()} (or 'custom')")
     }
     sourceSets.main.java.srcDir rootProject.file("${adapter.sourceDir}/src/main/java")
+    // The family mixin config (commandapi.mixins.json) for /commandapi chat
+    // commands. The file name is identical in every family on purpose: only
+    // one family is ever on a module's classpath.
+    def adapterResources = rootProject.file("${adapter.sourceDir}/src/main/resources")
+    if (adapterResources.directory) {
+        sourceSets.main.resources.srcDir adapterResources
+    }
 }
 
 // fabric.mod.json is one shared template expanded per target.
