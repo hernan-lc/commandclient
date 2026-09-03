@@ -1,6 +1,6 @@
 {
   "_comment": "Authoritative compatibility manifest. settings.gradle, the build, CI, the release workflow and the doc generators all read this file. Nothing here may be duplicated elsewhere. See docs/ADDING_VERSION.md.",
-  "modVersion": "1.2.1",
+  "modVersion": "1.3.1",
   "buildFamilies": {
     "legacy-remapped": {
       "description": "Minecraft <= 1.21.11 ships obfuscated, so Loom remaps the mod against official Mojang mappings and the production artifact comes from remapJar.",

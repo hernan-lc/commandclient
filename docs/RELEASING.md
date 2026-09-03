@@ -6,7 +6,7 @@ A release publishes one JAR per supported Minecraft version, plus
 ## The one rule
 
 The tag must match `modVersion` in `versions.json`. Tag `v1.2.1` requires
-`"modVersion": "1.2.1"`. The workflow checks this **before** building and stops
+`"modVersion": "1.3.1"`. The workflow checks this **before** building and stops
 in seconds if they disagree, because the JARs it would produce are named after
 `modVersion` — publishing `commandapi-1.2.0+mc26.2.jar` under a `v1.2.1` tag
 would be a lie about what the artifacts are.
@@ -15,13 +15,13 @@ would be a lie about what the artifacts are.
 
 ```bash
 # 1. Bump the version in the manifest (the single source of truth).
-#    Edit versions.json: "modVersion": "1.2.1"
+#    Edit versions.json: "modVersion": "1.3.1"
 
 # 2. Rebuild so the artifacts and generated tables carry the new version.
 ./gradlew buildAllVersions verifyBuilds versionTable
 
 # 3. Commit.
-git commit -am "release: 1.2.1"
+git commit -am "release: 1.3.1"
 git push
 
 # 4. Tag that commit and push the tag. This triggers the Release workflow.
@@ -65,10 +65,10 @@ Either move the tag onto a commit whose `modVersion` matches, or bump
 `modVersion` to the tag you want and re-tag:
 
 ```bash
-# releasing 1.2.1 from a tree that still says 1.2.0
-# edit versions.json -> 1.2.1
+# releasing 1.3.1 from a tree that still says 1.2.0
+# edit versions.json -> 1.3.1
 ./gradlew buildAllVersions versionTable
-git commit -am "release: 1.2.1" && git push
+git commit -am "release: 1.3.1" && git push
 git tag -f v1.2.1 && git push -f origin v1.2.1
 ```
 
