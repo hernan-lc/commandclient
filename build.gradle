@@ -134,3 +134,23 @@ tasks.register('printVersions') {
         }
     }
 }
+
+// Server releases are separate from Fabric artifacts and their compatibility manifest.
+tasks.register('buildServerAdapter') {
+    group = 'build'
+    dependsOn ':server-adapter:build'
+}
+tasks.register('collectServerArtifact') {
+    group = 'build'
+    dependsOn ':server-adapter:build'
+    doLast {
+        def jar = project(':server-adapter').tasks.named('jar').get().archiveFile.get().asFile
+        def target = layout.buildDirectory.dir('server-distributions').get().asFile
+        target.mkdirs()
+        Files.copy(jar.toPath(), new File(target, jar.name).toPath(), StandardCopyOption.REPLACE_EXISTING)
+        new File(target, 'server-manifest.json').text = JsonOutput.prettyPrint(JsonOutput.toJson([
+            modVersion: modVersionValue, file: jar.name, java: 21, apiVersion: '1.21', folia: false,
+            dependencyPolicy: 'Gson provided by Bukkit/Minecraft; shared core bundled'
+        ])) + '\n'
+    }
+}

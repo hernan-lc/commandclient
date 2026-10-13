@@ -10,11 +10,11 @@ dependencies {
     implementation project(':common')
 }
 java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+// Bukkit/Minecraft provides Gson. Bundle only our shared core; no server API or duplicate Gson.
 tasks.named('jar') {
-    dependsOn ':common:jar'
-    from { configurations.runtimeClasspath.findAll { it.name.endsWith('.jar') }.collect { zipTree(it) } }
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
+    dependsOn ':common:classes'
+    from project(':common').sourceSets.main.output
+    duplicatesStrategy = DuplicatesStrategy.FAIL
 }
 
 tasks.named('processResources') {
@@ -28,4 +28,13 @@ dependencies {
     testImplementation 'org.mockito:mockito-core:5.14.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
-tasks.named('test') { useJUnitPlatform() }
+tasks.named('test') {
+    dependsOn 'jar'
+    useJUnitPlatform()
+    systemProperty 'commandapi.pluginJar', tasks.named('jar').get().archiveFile.get().asFile.absolutePath
+}
+tasks.register('verifyPlugin', Exec) {
+    dependsOn 'jar'
+    commandLine 'python3', rootProject.file('scripts/verify-plugin.py').absolutePath, tasks.named('jar').get().archiveFile.get().asFile.absolutePath
+}
+tasks.named('check') { dependsOn 'verifyPlugin' }

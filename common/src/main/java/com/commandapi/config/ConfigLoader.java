@@ -63,7 +63,7 @@ public final class ConfigLoader {
         String token = string(json, "token", "api.token", "");
         boolean authEnabled = bool(json, "authEnabled", "api.auth.enabled", true);
         if (token.isEmpty()) {
-            if (has(json, "authEnabled") && json.get("authEnabled").getAsBoolean())
+            if (has(json, "token") && has(json, "authEnabled") && json.get("authEnabled").getAsBoolean())
                 throw new IllegalArgumentException("Authentication enabled with empty token");
             token = ApiConfig.newToken();
             authEnabled = true;

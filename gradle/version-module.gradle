@@ -202,6 +202,7 @@ tasks.register('generateNetworking') {
 tasks.named('compileJava') { dependsOn 'generateNetworking' }
 
 tasks.named('processResources') {
+    inputs.property('networkCapabilities', spec.network)
     dependsOn 'generateNetworking'
     exclude 'commandapi.mixins.json'
     doLast {

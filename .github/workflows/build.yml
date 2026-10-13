@@ -65,6 +65,29 @@ jobs:
           fi
           echo "common/ is free of Minecraft and Fabric imports"
 
+  server:
+    name: Paper/Spigot adapter tests and packaging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Build, test, and verify plugin
+        run: ./gradlew :server-adapter:build collectServerArtifact
+      - uses: actions/upload-artifact@v7
+        with:
+          name: commandapi-server
+          path: build/server-distributions
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: commandapi-server-test-reports
+          path: server-adapter/build/test-results/test
+
   build:
     name: Minecraft ${{ matrix.target.minecraft }}
     needs: targets
@@ -104,7 +127,7 @@ jobs:
 
   aggregate:
     name: Collect and verify
-    needs: [targets, build]
+    needs: [targets, shared, server, build]
     # Runs even when a target failed, so the report names the version that broke
     # rather than silently skipping verification.
     if: always()
@@ -125,6 +148,20 @@ jobs:
           path: build/distributions
           pattern: commandapi-mc*
           merge-multiple: true
+
+      - name: Require all build and test jobs
+        run: |
+          test '${{ needs.build.result }}' = success
+          test '${{ needs.shared.result }}' = success
+          test '${{ needs.server.result }}' = success
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: commandapi-server
+          path: build/server-distributions
+
+      - name: Verify server artifact
+        run: python3 scripts/verify-plugin.py build/server-distributions/commandapi-server-*.jar
 
       - name: Generate manifest
         run: python3 scripts/generate-manifest.py

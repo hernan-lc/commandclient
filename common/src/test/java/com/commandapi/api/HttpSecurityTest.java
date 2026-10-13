@@ -60,6 +60,7 @@ class HttpSecurityTest {
         assertFalse(first.toString().contains(first.getToken()));
         if (Files.getFileStore(dir).supportsFileAttributeView("posix"))
             assertEquals(java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"), Files.getPosixFilePermissions(dir.resolve(ConfigLoader.CONFIG_FILE_NAME)));
+        assertTrue(ConfigLoader.parse("{\"authEnabled\":true}").getToken().length() >= 43);
         assertThrows(IllegalArgumentException.class, () -> ConfigLoader.parse("{\"authEnabled\":true,\"token\":\"\"}"));
     }
     @Test void remoteBindingNeedsExplicitOptIn() {
