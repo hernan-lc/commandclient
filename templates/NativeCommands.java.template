@@ -7,9 +7,19 @@ import net.minecraft.client.Minecraft;
 
 /** Generated exclusively from versions.json capabilities. Called on the client thread. */
 public final class NativeCommands {
+    private static final com.commandapi.minecraft.TickCommandQueue queue = new com.commandapi.minecraft.TickCommandQueue();
+    private static volatile com.commandapi.config.ApiConfig configuration = com.commandapi.config.ApiConfig.defaults();
+    private static volatile net.minecraft.server.MinecraftServer currentServer;
     private static volatile Object currentSession;
-    public static void observeSession(Object connection) { currentSession = connection; }
-    public static CompletableFuture<ChatResult> submit(String text, boolean elevated) {
+    public static void configure(com.commandapi.config.ApiConfig config) { configuration = config; }
+    public static synchronized void observeSession(Object connection, net.minecraft.server.MinecraftServer server) {
+        if (currentSession != connection || currentServer != server) queue.reset();
+        currentSession = connection; currentServer = server;
+    }
+    public static void drain(net.minecraft.server.MinecraftServer server) {
+        if (currentServer == server) queue.drain(currentSession, configuration.getCommandsPerTick(), 2000000L);
+    }
+    public static CompletableFuture<ChatResult> submit(String text, boolean elevated, com.commandapi.minecraft.CancellationToken cancellation) {
         Minecraft client = Minecraft.getInstance();
         if (!client.isLocalServer() || client.getSingleplayerServer() == null) return null;
         CompletableFuture<ChatResult> result = new CompletableFuture<>();
@@ -18,38 +28,24 @@ public final class NativeCommands {
             return result;
         }
         Object session = client.player.connection;
-        observeSession(session);
+        observeSession(session, client.getSingleplayerServer());
         net.minecraft.server.MinecraftServer server = client.getSingleplayerServer();
         java.util.UUID playerId = client.player.getUUID();
-        try {
-            server.execute(() -> {
-                if (result.isDone()) return;
-                if (currentSession != session || !server.isRunning()) {
-                    result.complete(ChatResult.failure("Singleplayer session ended", "SESSION_CHANGED")); return;
-                }
-                try {
-                    net.minecraft.server.level.ServerPlayer player = server.getPlayerList().getPlayer(playerId);
-                    if (player == null) {
-                        result.complete(ChatResult.failure("Player unavailable", "SESSION_CHANGED")); return;
-                    }
-                    net.minecraft.commands.CommandSourceStack source = player.createCommandSourceStack();
-                    if (elevated) source = source.withPermission(${permission});
-                    ExecutionFeedback feedback = new ExecutionFeedback();
-                    source = source.withCallback(${callback});
-                    com.mojang.brigadier.ParseResults<net.minecraft.commands.CommandSourceStack> parsed =
-                            server.getCommands().getDispatcher().parse(text.substring(1), source);
-                    if (parsed.getReader().canRead() || !parsed.getExceptions().isEmpty()) {
-                        result.complete(ChatResult.failure("Invalid command or insufficient permission", "COMMAND_REJECTED")); return;
-                    }
-                    server.getCommands().${execute};
-                    result.complete(feedback.result());
-                } catch (Throwable error) {
-                    result.complete(ChatResult.failure("Native dispatcher failed", "DISPATCH_EXCEPTION"));
-                }
-            });
-        } catch (RuntimeException error) {
-            result.complete(ChatResult.failure("Integrated server unavailable", "SERVER_UNAVAILABLE"));
-        }
-        return result;
+        return queue.submit(session, cancellation, () -> {
+            if (currentSession != session || currentServer != server || !server.isRunning())
+                return ChatResult.failure("Singleplayer session ended", "SESSION_CHANGED");
+            net.minecraft.server.level.ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player == null) return ChatResult.failure("Player unavailable", "SESSION_CHANGED");
+            net.minecraft.commands.CommandSourceStack source = player.createCommandSourceStack();
+            if (elevated) source = source.withPermission(${permission});
+            ExecutionFeedback feedback = new ExecutionFeedback();
+            source = source.withCallback(${callback});
+            com.mojang.brigadier.ParseResults<net.minecraft.commands.CommandSourceStack> parsed =
+                    server.getCommands().getDispatcher().parse(text.substring(1), source);
+            if (parsed.getReader().canRead() || !parsed.getExceptions().isEmpty())
+                return ChatResult.failure("Invalid command or insufficient permission", "COMMAND_REJECTED");
+            server.getCommands().${execute};
+            return feedback.result();
+        }, configuration.getMaxQueuedCommands());
     }
 }

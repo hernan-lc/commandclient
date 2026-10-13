@@ -29,6 +29,11 @@ public interface MinecraftBridge {
                 : ChatResult.failure("Session changed");
     }
 
+    default java.util.concurrent.CompletableFuture<ChatResult> submitChat(String text, Object session, CancellationToken cancellation) {
+        if (cancellation.isCancelled()) return java.util.concurrent.CompletableFuture.completedFuture(ChatResult.failure("Cancelled", "CANCELLED"));
+        return java.util.concurrent.CompletableFuture.completedFuture(sendChat(text, session));
+    }
+
     default void configure(com.commandapi.config.ApiConfig config) { }
 
     default String executionMode() { return "client-chat"; }

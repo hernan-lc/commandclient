@@ -22,6 +22,8 @@ public final class MinecraftBridgeImpl extends ClientThreadBridge {
         return onClientThread(() -> Minecraft.getInstance().player != null, false, error -> false);
     }
 
+    @Override protected void configureNative(com.commandapi.config.ApiConfig config) { NativeCommands.configure(config); }
+
     @Override
     public String executionMode() {
         return onClientThread(() -> Minecraft.getInstance().isLocalServer() ? "singleplayer-native" : "client-chat",
@@ -43,8 +45,8 @@ public final class MinecraftBridgeImpl extends ClientThreadBridge {
     }
 
     @Override
-    protected java.util.concurrent.CompletableFuture<ChatResult> nativeCommand(String text) {
-        return NativeCommands.submit(text, elevatedSingleplayer());
+    protected java.util.concurrent.CompletableFuture<ChatResult> nativeCommand(String text, com.commandapi.minecraft.CancellationToken cancellation) {
+        return NativeCommands.submit(text, elevatedSingleplayer(), cancellation);
     }
 
     @Override

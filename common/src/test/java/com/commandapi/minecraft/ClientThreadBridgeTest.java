@@ -93,7 +93,7 @@ class ClientThreadBridgeTest {
         ChatResult result = bridge.sendChat("boom");
 
         assertFalse(result.isSuccess());
-        assertTrue(result.getMessage().contains("failed"));
+        assertTrue(result.getMessage().toLowerCase().contains("failed"));
     }
 
     @Test

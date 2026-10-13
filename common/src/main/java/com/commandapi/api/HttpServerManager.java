@@ -78,7 +78,9 @@ public final class HttpServerManager {
                 return false;
             }
             server = HttpServer.create(new InetSocketAddress(config.getHost(), config.getPort()), 0);
-            executor = Executors.newCachedThreadPool(daemonThreadFactory());
+            executor = new java.util.concurrent.ThreadPoolExecutor(config.getHttpWorkers(), config.getHttpWorkers(), 0, java.util.concurrent.TimeUnit.SECONDS,
+                    new java.util.concurrent.ArrayBlockingQueue<>(config.getMaxHttpQueue()), daemonThreadFactory(),
+                    new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
             server.setExecutor(executor);
 
             server.createContext("/api/chat", new ChatHandler());
@@ -87,7 +89,7 @@ public final class HttpServerManager {
             // Catch-all so unknown paths get a JSON 404 instead of an empty body.
             server.createContext("/", new NotFoundHandler());
 
-            jobs = new JobManager(bridge);
+            jobs = new JobManager(bridge, config);
             server.createContext("/api/jobs", new JobsHandler());
             server.start();
             registerShutdownHook();
@@ -300,11 +302,17 @@ public final class HttpServerManager {
                 return;
             }
 
-            List<JsonObject> results = new ArrayList<>();
-            for (String message : request.getMessages()) {
-                ChatResult result = bridge.sendChat(message);
-                results.add(ApiResponse.chatResult(message, result));
-            }
+            CommandScheduler.Work work = jobs.execute(request);
+            if (work == null) { sendError(exchange, 429, "Execution queue full"); return; }
+            try { work.await(config.getExecutionTimeoutSeconds()); }
+            catch (java.util.concurrent.TimeoutException error) { work.cancel("HTTP_WAIT_TIMEOUT"); }
+            catch (InterruptedException error) { work.cancel("HTTP_WAIT_CANCELLED"); Thread.currentThread().interrupt(); }
+            catch (java.util.concurrent.ExecutionException error) { work.cancel("EXECUTION_FAILED"); }
+            List<JsonObject> results = work.results();
+            for (int i = results.size(); i < request.getMessages().size(); i++)
+                results.add(ApiResponse.chatResult(request.getMessages().get(i),
+                        ChatResult.unknown("Completion unavailable; inspect job and do not retry automatically", "OUTCOME_UNKNOWN")));
+            exchange.getResponseHeaders().set("Location", "/api/jobs/" + work.id());
             sendJson(exchange, 200, ApiResponse.chat(results, request.isBatch()));
         }
     }
@@ -349,6 +357,8 @@ public final class HttpServerManager {
             JsonObject status = ApiResponse.status(config, getHost(), getPort(),
                     inWorld, inWorld ? bridge.getPlayerName() : null, modVersion, minecraftVersion);
             status.addProperty("mode", bridge.executionMode());
+            status.addProperty("execution_mode", bridge.executionMode());
+            for (java.util.Map.Entry<String, com.google.gson.JsonElement> entry : jobs.status().entrySet()) status.add(entry.getKey(), entry.getValue());
             sendJson(exchange, 200, status);
         }
     }
