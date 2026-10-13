@@ -1,0 +1,13 @@
+package com.commandapi.version.mixin;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+@Mixin(net.minecraft.client.Minecraft.class)
+public abstract class CommandApiDisconnectMixin {
+    @Inject(method = "${disconnectMethod}", at = @At("HEAD"))
+    private void commandapiDisconnect(CallbackInfo ci) {
+        com.commandapi.version.NativeCommands.observeSession(null, null);
+        com.commandapi.version.ClientNetworking.reset();
+    }
+}

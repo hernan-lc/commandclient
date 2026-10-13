@@ -358,6 +358,8 @@ public final class HttpServerManager {
                     inWorld, inWorld ? bridge.getPlayerName() : null, modVersion, minecraftVersion);
             status.addProperty("mode", bridge.executionMode());
             status.addProperty("execution_mode", bridge.executionMode());
+            status.add("capabilities", bridge.capabilities());
+            status.addProperty("mutation_auth_required", true);
             for (java.util.Map.Entry<String, com.google.gson.JsonElement> entry : jobs.status().entrySet()) status.add(entry.getKey(), entry.getValue());
             sendJson(exchange, 200, status);
         }

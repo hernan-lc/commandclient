@@ -36,6 +36,11 @@ public interface MinecraftBridge {
 
     default void configure(com.commandapi.config.ApiConfig config) { }
 
+    default com.google.gson.JsonObject capabilities() {
+        com.google.gson.JsonObject json = new com.google.gson.JsonObject();
+        json.addProperty("async_jobs", true); return json;
+    }
+
     default String executionMode() { return "client-chat"; }
 
     /** Stable identity for the current connection; jobs cannot cross sessions. */

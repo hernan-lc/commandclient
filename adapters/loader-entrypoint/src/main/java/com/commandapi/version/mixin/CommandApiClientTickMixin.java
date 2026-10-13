@@ -11,6 +11,7 @@ public abstract class CommandApiClientTickMixin {
     @Inject(method = "tick", at = @At("HEAD"))
     private void commandapiTick(CallbackInfo ci) {
         Minecraft client = (Minecraft) (Object) this;
+        com.commandapi.version.ClientNetworking.tick();
         NativeCommands.observeSession(client.player == null ? null : client.player.connection, client.getSingleplayerServer());
     }
 }

@@ -54,6 +54,12 @@
         "permissions": "set",
         "entrypoint": "performPrefixedCommand",
         "callback": "result"
+      },
+      "network": {
+        "payload": "codec",
+        "identifier": "Identifier",
+        "identifierFactory": "parse",
+        "disconnectMethod": "disconnect(Lnet/minecraft/client/gui/screens/Screen;ZZ)V"
       }
     },
     "26.2": {
@@ -70,6 +76,12 @@
         "permissions": "set",
         "entrypoint": "performPrefixedCommand",
         "callback": "result"
+      },
+      "network": {
+        "payload": "codec",
+        "identifier": "Identifier",
+        "identifierFactory": "parse",
+        "disconnectMethod": "disconnect(Lnet/minecraft/client/gui/screens/Screen;ZZ)V"
       }
     },
     "26.1": {
@@ -87,6 +99,12 @@
         "permissions": "set",
         "entrypoint": "performPrefixedCommand",
         "callback": "result"
+      },
+      "network": {
+        "payload": "codec",
+        "identifier": "Identifier",
+        "identifierFactory": "parse",
+        "disconnectMethod": "disconnect(Lnet/minecraft/client/gui/screens/Screen;ZZ)V"
       }
     },
     "1.21.11": {
@@ -104,6 +122,12 @@
         "permissions": "set",
         "entrypoint": "performPrefixedCommand",
         "callback": "result"
+      },
+      "network": {
+        "payload": "codec",
+        "identifier": "Identifier",
+        "identifierFactory": "parse",
+        "disconnectMethod": "disconnect(Lnet/minecraft/client/gui/screens/Screen;ZZ)V"
       }
     },
     "1.21.8": {
@@ -120,6 +144,12 @@
         "permissions": "numeric",
         "entrypoint": "performPrefixedCommand",
         "callback": "result"
+      },
+      "network": {
+        "payload": "codec",
+        "identifier": "ResourceLocation",
+        "identifierFactory": "fromNamespaceAndPath",
+        "disconnectMethod": "disconnect(Lnet/minecraft/client/gui/screens/Screen;Z)V"
       }
     },
     "1.21.4": {
@@ -136,6 +166,12 @@
         "permissions": "numeric",
         "entrypoint": "performPrefixedCommand",
         "callback": "result"
+      },
+      "network": {
+        "payload": "codec",
+        "identifier": "ResourceLocation",
+        "identifierFactory": "fromNamespaceAndPath",
+        "disconnectMethod": "disconnect(Lnet/minecraft/client/gui/screens/Screen;Z)V"
       }
     },
     "1.21.1": {
@@ -152,6 +188,12 @@
         "permissions": "numeric",
         "entrypoint": "performPrefixedCommand",
         "callback": "result"
+      },
+      "network": {
+        "payload": "codec",
+        "identifier": "ResourceLocation",
+        "identifierFactory": "fromNamespaceAndPath",
+        "disconnectMethod": "disconnect(Lnet/minecraft/client/gui/screens/Screen;Z)V"
       }
     },
     "1.20.6": {
@@ -168,6 +210,12 @@
         "permissions": "numeric",
         "entrypoint": "performPrefixedCommand",
         "callback": "result"
+      },
+      "network": {
+        "payload": "codec",
+        "identifier": "ResourceLocation",
+        "identifierFactory": "constructor",
+        "disconnectMethod": "disconnect(Lnet/minecraft/client/gui/screens/Screen;Z)V"
       }
     },
     "1.20.4": {
@@ -184,6 +232,12 @@
         "permissions": "numeric",
         "entrypoint": "performPrefixedCommand",
         "callback": "result"
+      },
+      "network": {
+        "payload": "typed",
+        "identifier": "ResourceLocation",
+        "identifierFactory": "constructor",
+        "disconnectMethod": "disconnect(Lnet/minecraft/client/gui/screens/Screen;)V"
       }
     },
     "1.20.1": {
@@ -200,6 +254,12 @@
         "permissions": "numeric",
         "entrypoint": "performPrefixedCommand",
         "callback": "brigadier"
+      },
+      "network": {
+        "payload": "legacy",
+        "identifier": "ResourceLocation",
+        "identifierFactory": "constructor",
+        "disconnectMethod": "clearLevel(Lnet/minecraft/client/gui/screens/Screen;)V"
       }
     },
     "1.19.4": {
@@ -216,6 +276,12 @@
         "permissions": "numeric",
         "entrypoint": "performPrefixedCommand",
         "callback": "brigadier"
+      },
+      "network": {
+        "payload": "legacy",
+        "identifier": "ResourceLocation",
+        "identifierFactory": "constructor",
+        "disconnectMethod": "clearLevel(Lnet/minecraft/client/gui/screens/Screen;)V"
       }
     },
     "1.19.2": {
@@ -232,6 +298,12 @@
         "permissions": "numeric",
         "entrypoint": "performPrefixedCommand",
         "callback": "brigadier"
+      },
+      "network": {
+        "payload": "legacy",
+        "identifier": "ResourceLocation",
+        "identifierFactory": "constructor",
+        "disconnectMethod": "clearLevel(Lnet/minecraft/client/gui/screens/Screen;)V"
       }
     },
     "1.18.2": {
@@ -248,6 +320,12 @@
         "permissions": "numeric",
         "entrypoint": "performCommand",
         "callback": "brigadier"
+      },
+      "network": {
+        "payload": "legacy",
+        "identifier": "ResourceLocation",
+        "identifierFactory": "constructor",
+        "disconnectMethod": "clearLevel(Lnet/minecraft/client/gui/screens/Screen;)V"
       }
     },
     "1.16.5": {
@@ -265,6 +343,12 @@
         "permissions": "numeric",
         "entrypoint": "performCommand",
         "callback": "brigadier"
+      },
+      "network": {
+        "payload": "legacy",
+        "identifier": "ResourceLocation",
+        "identifierFactory": "constructor",
+        "disconnectMethod": "clearLevel(Lnet/minecraft/client/gui/screens/Screen;)V"
       }
     },
     "1.16.1": {
@@ -281,6 +365,12 @@
         "permissions": "numeric",
         "entrypoint": "performCommand",
         "callback": "brigadier"
+      },
+      "network": {
+        "payload": "legacy",
+        "identifier": "ResourceLocation",
+        "identifierFactory": "constructor",
+        "disconnectMethod": "clearLevel(Lnet/minecraft/client/gui/screens/Screen;)V"
       }
     }
   }

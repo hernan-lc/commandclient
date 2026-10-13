@@ -27,6 +27,7 @@ final class PluginMessageBridge implements PluginMessageListener, AutoCloseable 
             reply(player, Message.now(Kind.CAPABILITIES, message.id, session.negotiated ? "player" : "denied")); return;
         }
         if (!session.negotiated || !executor.authorized(player)) { reply(player, Message.now(Kind.ERROR, message.id, "PLAYER_DENIED")); return; }
+        session.requests.entrySet().removeIf(entry -> entry.getValue().result != null && now - entry.getValue().createdAt > 60000);
         Request prior = session.requests.get(message.id);
         if (message.kind == Kind.CANCEL) {
             if (prior != null) prior.cancellation.cancel();
@@ -39,7 +40,7 @@ final class PluginMessageBridge implements PluginMessageListener, AutoCloseable 
             return;
         }
         if (message.kind != Kind.EXECUTE) { reply(player, Message.now(Kind.ERROR, message.id, "UNEXPECTED_MESSAGE")); return; }
-        // Requests are never evicted within a live session: replay protection remains valid for its whole lifetime.
+        // Retain results beyond the 30-second frame validity window; active requests are never evicted.
         if (session.requests.size() >= 512) { reply(player, Message.now(Kind.ERROR, message.id, "SESSION_CAPACITY")); return; }
         if (++session.commands > 4 && now - session.commandWindow < 1000) { reply(player, Message.now(Kind.ERROR, message.id, "RATE_LIMITED")); return; }
         if (now - session.commandWindow >= 1000) { session.commandWindow = now; session.commands = 1; }
@@ -62,5 +63,5 @@ final class PluginMessageBridge implements PluginMessageListener, AutoCloseable 
         boolean negotiated; long window, commandWindow; int received, commands;
         final Map<UUID, Request> requests = new LinkedHashMap<>();
     }
-    private static final class Request { final CancellationToken cancellation = new CancellationToken(); ChatResult result; }
+    private static final class Request { final long createdAt = System.currentTimeMillis(); final CancellationToken cancellation = new CancellationToken(); ChatResult result; }
 }

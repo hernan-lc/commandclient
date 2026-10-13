@@ -152,3 +152,65 @@ tasks.register('generateNativeCommands') {
     }
 }
 tasks.named('compileJava') { dependsOn 'generateNativeCommands' }
+
+def networkSources = layout.buildDirectory.dir('generated/sources/network')
+sourceSets.main.java.srcDir networkSources
+tasks.register('generateNetworking') {
+    inputs.property('networkCapabilities', spec.network)
+    inputs.files(rootProject.fileTree('templates') { include '*Payload*.template', 'ClientNetworking.java.template', 'CommandApiDisconnectMixin.java.template' })
+    outputs.dir networkSources
+    doLast {
+        def n = spec.network
+        if (!(n.payload in ['legacy', 'typed', 'codec']) || !(n.identifier in ['ResourceLocation', 'Identifier']))
+            throw new GradleException("Invalid networking capabilities for ${project.name}")
+        def idType = "net.minecraft.resources.${n.identifier}"
+        def factory = n.identifierFactory == 'constructor' ? "new ${idType}(channel)" : "${idType}.${n.identifierFactory == 'parse' ? 'parse(channel)' : 'fromNamespaceAndPath(channel.split(":", 2)[0], channel.split(":", 2)[1])'}"
+        def legacy = n.payload == 'legacy'
+        def packet = legacy ? 'net.minecraft.network.protocol.game.ClientboundCustomPayloadPacket' : 'net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket'
+        def properties = [disconnectMethod: n.disconnectMethod, identifier: n.identifier, factory: factory, payloadImport: legacy ? "" : "import com.commandapi.version.BridgePayload;",
+            send: legacy ? "client.player.connection.send(new net.minecraft.network.protocol.game.ServerboundCustomPayloadPacket(${factory}, new net.minecraft.network.FriendlyByteBuf(io.netty.buffer.Unpooled.wrappedBuffer(bytes))));" : 'client.player.connection.send(new net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket(new BridgePayload(channel, bytes)));',
+            listener: legacy ? 'net.minecraft.client.multiplayer.ClientPacketListener' : 'net.minecraft.client.multiplayer.ClientCommonPacketListenerImpl',
+            packet: packet, packetDescriptor: packet.replace('.', '/'),
+            receive: legacy ? '''if (!packet.getIdentifier().toString().equals("commandapi:bridge")) return;
+        net.minecraft.network.FriendlyByteBuf buffer = packet.getData();
+        try {
+            if (buffer.readableBytes() <= com.commandapi.protocol.BridgeProtocol.MAX_BYTES) {
+                byte[] bytes = new byte[buffer.readableBytes()]; buffer.readBytes(bytes); ClientNetworking.receive(this, bytes);
+            }
+        } finally { buffer.release(); }
+        ci.cancel();''' : '''if (!(packet.payload() instanceof BridgePayload)) return;
+        ClientNetworking.receive(this, ((BridgePayload)packet.payload()).bytes); ci.cancel();''',
+            payloadMethods: n.payload == 'typed' ? '''public void write(FriendlyByteBuf buffer) { buffer.writeBytes(bytes); }
+    public net.minecraft.resources.ResourceLocation id() { return identifier; }''' : '''public net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type<BridgePayload> type() {
+        return new net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type<>(identifier);
+    }'''
+        ]
+        def templates = ['ClientNetworking', 'CommandApiPayloadMixin', 'CommandApiDisconnectMixin']
+        if (!legacy) templates.add('BridgePayload')
+        if (n.payload == 'codec') templates.add('CommandApiPayloadCodecMixin')
+        if (n.payload == 'typed') templates.add('CommandApiTypedPayloadMixin')
+        templates.each { name ->
+            copy {
+                from rootProject.file("templates/${name}.java.template")
+                into new File(networkSources.get().asFile, name.contains('Mixin') ? 'com/commandapi/version/mixin' : 'com/commandapi/version')
+                rename { "${name}.java" }
+                expand properties
+            }
+        }
+    }
+}
+tasks.named('compileJava') { dependsOn 'generateNetworking' }
+
+tasks.named('processResources') {
+    dependsOn 'generateNetworking'
+    exclude 'commandapi.mixins.json'
+    doLast {
+        def base = new groovy.json.JsonSlurper().parse(rootProject.file("${manifest.adapterFamilies[spec.adapterFamily].sourceDir}/src/main/resources/commandapi.mixins.json"))
+        if (spec.network.payload == 'codec') base.compatibilityLevel = 'JAVA_17'
+        base.client.add('CommandApiPayloadMixin')
+        base.client.add('CommandApiDisconnectMixin')
+        if (spec.network.payload == 'codec') base.client.add('CommandApiPayloadCodecMixin')
+        if (spec.network.payload == 'typed') base.client.add('CommandApiTypedPayloadMixin')
+        new File(destinationDir, 'commandapi.mixins.json').text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(base)) + '\n'
+    }
+}

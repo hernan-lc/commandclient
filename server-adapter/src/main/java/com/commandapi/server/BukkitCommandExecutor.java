@@ -32,6 +32,11 @@ final class BukkitCommandExecutor implements MinecraftBridge, ServerCommandExecu
     @Override public boolean isInWorld() { return onMain(() -> sender() != null, false); }
     @Override public String getPlayerName() { return onMain(() -> sender() == null ? null : sender().getName(), null); }
     @Override public Object sessionIdentity() { return onMain(() -> sender(), null); }
+    @Override public com.google.gson.JsonObject capabilities() {
+        com.google.gson.JsonObject json = new com.google.gson.JsonObject();
+        json.addProperty("protocol_version", com.commandapi.protocol.BridgeProtocol.VERSION);
+        json.addProperty("async_jobs", true); json.addProperty("console", settings.console); json.addProperty("tick_queue_depth", queue.size()); return json;
+    }
     @Override public String executionMode() { return "server-native-" + (settings.console ? "console" : "player"); }
     @Override public ChatResult sendChat(String text) {
         if (Bukkit.isPrimaryThread()) return ChatResult.failure("Use asynchronous submission on the server thread", "THREAD_OWNERSHIP");
