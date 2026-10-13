@@ -230,4 +230,34 @@ class HttpServerManagerTest {
             assertTrue(rebind.isBound());
         }
     }
+    @Test
+    void asyncJobsCanBeSubmittedAndInspectedOverHttp() throws Exception {
+        start(false, "");
+        Response submitted = call("/api/jobs", "POST", "{\"messages\":[\"/one\",\"/two\"]}", null);
+        assertEquals(202, submitted.status);
+        String path = "/api/jobs/" + submitted.body.get("id").getAsString();
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(3);
+        Response current;
+        do {
+            current = call(path, "GET", null, null);
+            if (current.body.get("state").getAsString().equals("completed")) break;
+            Thread.sleep(5);
+        } while (System.nanoTime() < deadline);
+        assertEquals("completed", current.body.get("state").getAsString());
+        assertEquals(2, current.body.get("processed").getAsInt());
+        assertEquals(java.util.Arrays.asList("/one", "/two"), bridge.sent);
+        assertEquals(200, call(path, "DELETE", null, null).status);
+        assertEquals(404, call("/api/jobs/00000000-0000-0000-0000-000000000000", "GET", null, null).status);
+    }
+
+    @Test
+    void asyncRoutesRequireAuthenticationAndRejectOfflineSubmissions() throws Exception {
+        start(true, "secret");
+        assertEquals(401, call("/api/jobs", "POST", "{\"text\":\"/one\"}", null).status);
+        assertEquals(401, call("/api/jobs/00000000-0000-0000-0000-000000000000", "GET", null, null).status);
+        assertEquals(401, call("/api/jobs/00000000-0000-0000-0000-000000000000", "DELETE", null, null).status);
+        bridge.inWorld = false;
+        assertEquals(503, call("/api/jobs", "POST", "{\"text\":\"/one\"}", "Bearer secret").status);
+    }
+
 }

@@ -32,9 +32,34 @@ public abstract class ClientThreadBridge implements MinecraftBridge {
     /** Performs the send; always invoked on the client thread. */
     protected abstract ChatResult sendChatOnClientThread(String text);
 
+    /** Optional native command execution, captured on the client thread. */
+    protected CompletableFuture<ChatResult> nativeCommand(String text) { return null; }
+
     @Override
-    public final ChatResult sendChat(String text) {
-        return onClientThread(() -> sendChatOnClientThread(text),
+    public final ChatResult sendChat(String text) { return sendChat(text, null); }
+
+    @Override
+    public final ChatResult sendChat(String text, Object session) {
+        if (text.startsWith("/")) {
+            CompletableFuture<ChatResult> nativeResult = onClientThread(() -> session != null && !java.util.Objects.equals(session, sessionIdentity())
+                    ? CompletableFuture.completedFuture(ChatResult.failure("Session changed")) : nativeCommand(text),
+                    CompletableFuture.completedFuture(ChatResult.failure("Client thread unavailable")),
+                    error -> CompletableFuture.completedFuture(ChatResult.failure(error)));
+            if (nativeResult != null) {
+                try { return nativeResult.get(30, TimeUnit.SECONDS); }
+                catch (TimeoutException e) {
+                    nativeResult.cancel(false);
+                    return ChatResult.failure("Native command timed out; an already running command may finish");
+                }
+                catch (InterruptedException e) {
+                    nativeResult.cancel(false);
+                    Thread.currentThread().interrupt();
+                    return ChatResult.failure("Native execution interrupted; an already running command may finish");
+                } catch (ExecutionException e) { return ChatResult.failure("Native execution failed: " + e.getCause()); }
+            }
+        }
+        return onClientThread(() -> session != null && !java.util.Objects.equals(session, sessionIdentity())
+                        ? ChatResult.failure("Session changed") : sendChatOnClientThread(text),
                 ChatResult.failure("Timed out waiting for the Minecraft client thread"),
                 error -> ChatResult.failure(error));
     }

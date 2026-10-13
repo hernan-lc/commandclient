@@ -49,6 +49,7 @@ public final class HttpServerManager {
     private final String minecraftVersion;
     private final Path configDir;
 
+    private JobManager jobs;
     private HttpServer server;
     private ExecutorService executor;
     private Thread shutdownHook;
@@ -81,6 +82,8 @@ public final class HttpServerManager {
             // Catch-all so unknown paths get a JSON 404 instead of an empty body.
             server.createContext("/", new NotFoundHandler());
 
+            jobs = new JobManager(bridge);
+            server.createContext("/api/jobs", new JobsHandler());
             server.start();
             registerShutdownHook();
             warnIfInsecurelyExposed();
@@ -96,6 +99,7 @@ public final class HttpServerManager {
 
     /** Stops the server and releases the port. Safe to call more than once. */
     public synchronized void stop() {
+        if (jobs != null) { jobs.close(); jobs = null; }
         if (server != null) {
             server.stop(0);
             server = null;
@@ -274,6 +278,30 @@ public final class HttpServerManager {
         }
     }
 
+    private final class JobsHandler extends SafeHandler {
+        @Override void handleSafely(HttpExchange exchange) throws IOException {
+            if (!authorize(exchange)) return;
+            String path = exchange.getRequestURI().getPath();
+            String method = exchange.getRequestMethod();
+            if (path.equals("/api/jobs") && method.equals("POST")) {
+                ApiRequest request = ApiRequest.parse(readBody(exchange));
+                if (!bridge.isInWorld()) { sendError(exchange, 503, "Session unavailable"); return; }
+                JsonObject job = jobs.submit(request);
+                if (job == null) { sendError(exchange, 429, "Job capacity reached"); return; }
+                exchange.getResponseHeaders().set("Location", "/api/jobs/" + job.get("id").getAsString());
+                sendJson(exchange, 202, job);
+                return;
+            }
+            if (path.matches("/api/jobs/[a-f0-9-]{36}") && (method.equals("GET") || method.equals("DELETE"))) {
+                JsonObject job = jobs.get(path.substring("/api/jobs/".length()), method.equals("DELETE"));
+                if (job == null) sendError(exchange, 404, "Job not found");
+                else sendJson(exchange, 200, job);
+                return;
+            }
+            sendError(exchange, path.equals("/api/jobs") ? 405 : 404, "Use POST /api/jobs or GET/DELETE /api/jobs/{id}");
+        }
+    }
+
     private final class StatusHandler extends SafeHandler {
         @Override
         void handleSafely(HttpExchange exchange) throws IOException {
@@ -286,9 +314,10 @@ public final class HttpServerManager {
                 return;
             }
             boolean inWorld = bridge.isInWorld();
-            sendJson(exchange, 200, ApiResponse.status(config, getHost(), getPort(),
-                    inWorld, inWorld ? bridge.getPlayerName() : null,
-                    modVersion, minecraftVersion));
+            JsonObject status = ApiResponse.status(config, getHost(), getPort(),
+                    inWorld, inWorld ? bridge.getPlayerName() : null, modVersion, minecraftVersion);
+            status.addProperty("mode", bridge.executionMode());
+            sendJson(exchange, 200, status);
         }
     }
 

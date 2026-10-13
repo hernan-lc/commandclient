@@ -1,0 +1,8 @@
+host: 127.0.0.1
+port: 0
+# Generated on first startup. Authentication is always enabled.
+token: ''
+# player preserves the selected player's permissions and location.
+# console explicitly grants the API server-console authority.
+sender: player
+player-uuid: ''

@@ -248,3 +248,8 @@ main().catch(console.error);
 The first call returns `result`; the second returns `results`. This example
 uses Node.js 18 or newer, where `fetch` is built in. See [example.js](example.js)
 for a runnable client with single and batch modes.
+
+## Native execution and asynchronous jobs
+
+See [native execution](NATIVE_EXECUTION.md) for elevated singleplayer commands,
+`POST /api/jobs`, `GET/DELETE /api/jobs/{id}`, and the Paper/Spigot adapter.

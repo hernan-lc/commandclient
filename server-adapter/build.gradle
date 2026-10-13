@@ -1,0 +1,23 @@
+plugins { id 'java' }
+version = rootProject.ext.modVersion
+base { archivesName = 'commandapi-server' }
+repositories {
+    mavenCentral()
+    maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+}
+dependencies {
+    compileOnly 'org.spigotmc:spigot-api:1.21.1-R0.1-SNAPSHOT'
+    implementation project(':common')
+}
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+tasks.named('jar') {
+    dependsOn ':common:jar'
+    from { configurations.runtimeClasspath.findAll { it.name.endsWith('.jar') }.collect { zipTree(it) } }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
+}
+
+tasks.named('processResources') {
+    inputs.property('version', project.version)
+    filesMatching('plugin.yml') { expand(version: project.version) }
+}

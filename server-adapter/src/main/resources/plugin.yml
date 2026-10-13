@@ -1,0 +1,5 @@
+name: CommandApiBridge
+version: '${version}'
+main: com.commandapi.server.CommandApiPlugin
+api-version: '1.21'
+description: Native authenticated HTTP command execution and asynchronous jobs.

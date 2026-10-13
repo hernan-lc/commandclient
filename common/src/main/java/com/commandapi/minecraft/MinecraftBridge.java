@@ -22,4 +22,16 @@ public interface MinecraftBridge {
      * it starts with {@code /}.
      */
     ChatResult sendChat(String text);
+
+    /** Checks session affinity before sending queued work. */
+    default ChatResult sendChat(String text, Object session) {
+        return java.util.Objects.equals(session, sessionIdentity()) ? sendChat(text)
+                : ChatResult.failure("Session changed");
+    }
+
+    default String executionMode() { return "client-chat"; }
+
+    /** Stable identity for the current connection; jobs cannot cross sessions. */
+    default Object sessionIdentity() { return getPlayerName(); }
+
 }

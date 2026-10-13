@@ -92,6 +92,8 @@ public final class ApiResponse {
         endpoints.addProperty("/api/status", "GET - Check API status");
         endpoints.addProperty("/api/chat", "POST - Send chat message");
         endpoints.addProperty("/api/execute", "POST - Alias for /api/chat");
+        endpoints.addProperty("/api/jobs", "POST - Submit asynchronous job");
+        endpoints.addProperty("/api/jobs/{id}", "GET/DELETE - Inspect or cancel job");
         status.add("endpoints", endpoints);
         return status;
     }

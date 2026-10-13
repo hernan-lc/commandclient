@@ -125,3 +125,53 @@ tasks.register('productionJar') {
     description = "Alias for this module's production JAR task (${family.productionJarTask})."
     dependsOn family.productionJarTask
 }
+
+// Generate the small native API seam: permissions and command entrypoints
+// changed across Minecraft generations. These calls remain statically mapped.
+def nativeSources = layout.buildDirectory.dir('generated/sources/native')
+sourceSets.main.java.srcDir nativeSources
+tasks.register('generateNativeCommands') {
+    inputs.property('minecraft', spec.minecraft)
+    outputs.dir nativeSources
+    doLast {
+        def modernPermissions = project.name.startsWith('26.') || project.name == '1.21.11'
+        def permission = modernPermissions ? 'net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS' : '4'
+        def prefixed = !(project.name.startsWith('1.16.') || project.name == '1.18.2')
+        def execute = prefixed ? 'performPrefixedCommand(source, text)' : 'performCommand(source, text.substring(1))'
+        def target = new File(nativeSources.get().asFile, 'com/commandapi/version/NativeCommands.java')
+        target.parentFile.mkdirs()
+        target.text = """package com.commandapi.version;
+import com.commandapi.minecraft.ChatResult;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.client.Minecraft;
+public final class NativeCommands {
+    public static CompletableFuture<ChatResult> submit(String text) {
+        Minecraft client = Minecraft.getInstance();
+        if (!client.isLocalServer() || client.getSingleplayerServer() == null) return null;
+        CompletableFuture<ChatResult> result = new CompletableFuture<>();
+        if (client.player == null) {
+            result.complete(ChatResult.failure("Player unavailable"));
+            return result;
+        }
+        net.minecraft.server.MinecraftServer server = client.getSingleplayerServer();
+        java.util.UUID playerId = client.player.getUUID();
+        server.execute(() -> {
+            if (result.isDone()) return;
+            try {
+                net.minecraft.server.level.ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+                if (player == null || !server.isRunning()) {
+                    result.complete(ChatResult.failure("Singleplayer session ended"));
+                    return;
+                }
+                net.minecraft.commands.CommandSourceStack source = player.createCommandSourceStack().withPermission(${permission});
+                server.getCommands().${execute};
+                result.complete(ChatResult.ok("Native command processed; see Minecraft feedback for command outcome"));
+            } catch (Throwable error) { result.complete(ChatResult.failure("Native execution failed: " + error)); }
+        });
+        return result;
+    }
+}
+"""
+    }
+}
+tasks.named('compileJava') { dependsOn 'generateNativeCommands' }

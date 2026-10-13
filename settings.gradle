@@ -37,6 +37,7 @@ plugins {
 rootProject.name = 'commandapi'
 
 include 'common'
+include 'server-adapter'
 
 new JsonSlurper().parse(file('versions.json')).versions.each { id, spec ->
     def dir = file("versions/${id}")

@@ -15,6 +15,7 @@ through the current 26.x releases: shared HTTP, config and API code lives in
 ## Quick links
 
 - [API reference](docs/API.md)
+- [Native execution, async jobs, and Paper/Spigot](docs/NATIVE_EXECUTION.md)
 - [Build guide](docs/BUILD.md)
 - [Supported versions](docs/VERSIONS.md) (generated)
 - [Adding a Minecraft version](docs/ADDING_VERSION.md)
@@ -166,7 +167,9 @@ other than loopback lets other machines send chat and commands as you — enable
 authentication if you do. `"loginSummary": true` prints a short config summary
 in chat every time you join a world.
 
-The API reports `Command submitted` after forwarding a slash command. Minecraft
+In singleplayer, API slash commands execute natively with an elevated command source.
+See [native execution and async jobs](docs/NATIVE_EXECUTION.md).
+On remote servers, the client API reports `Command submitted` after forwarding a slash command. Minecraft
 may still reject it; the HTTP response does not confirm server execution.
 If a host or port change fails, the previous config and HTTP server are restored.
 

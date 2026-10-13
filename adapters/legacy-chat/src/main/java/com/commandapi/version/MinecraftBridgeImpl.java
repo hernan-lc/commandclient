@@ -23,11 +23,28 @@ public final class MinecraftBridgeImpl extends ClientThreadBridge {
     }
 
     @Override
+    public String executionMode() {
+        return onClientThread(() -> Minecraft.getInstance().isLocalServer() ? "singleplayer-native" : "client-chat",
+                "unavailable", error -> "unavailable");
+    }
+
+    @Override
+    public Object sessionIdentity() {
+        return onClientThread(() -> Minecraft.getInstance().player == null ? null
+                : Minecraft.getInstance().player.connection, null, error -> null);
+    }
+
+    @Override
     public String getPlayerName() {
         return onClientThread(() -> {
             LocalPlayer player = Minecraft.getInstance().player;
             return player == null ? null : player.getName().getString();
         }, null, error -> null);
+    }
+
+    @Override
+    protected java.util.concurrent.CompletableFuture<ChatResult> nativeCommand(String text) {
+        return NativeCommands.submit(text);
     }
 
     @Override
