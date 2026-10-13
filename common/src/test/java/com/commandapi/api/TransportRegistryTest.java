@@ -19,7 +19,7 @@ class TransportRegistryTest {
         assertFalse(pending.isDone());
         plugin.receive(session, Message.now(Kind.CAPABILITIES, sent.get(0).id, "player"));
         Message execute = sent.get(1); assertEquals(Kind.EXECUTE, execute.kind);
-        plugin.receive(session, Message.now(Kind.EXECUTE_RESULT, execute.id, "{\"stage\":\"dispatched\",\"code\":\"DISPATCHED\",\"success\":true}"));
+        plugin.receive(session, Message.now(Kind.EXECUTE_RESULT, execute.id, "dispatched|DISPATCHED|true|"));
         assertEquals("dispatched", pending.join().getStage()); assertEquals(1, nativeCount.get()); assertEquals(0, vanillaCount.get());
         plugin.reset(); registry.execute(false, "/seed", new CancellationToken(), () -> true).join(); assertEquals(1, vanillaCount.get());
     }

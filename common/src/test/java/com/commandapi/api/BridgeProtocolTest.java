@@ -21,4 +21,11 @@ class BridgeProtocolTest {
         assertThrows(IllegalArgumentException.class, () -> BridgeProtocol.decode(BridgeProtocol.encode(Message.now(Kind.EXECUTE, UUID.randomUUID(), "/op x\n/stop")), System.currentTimeMillis()));
         assertThrows(IllegalArgumentException.class, () -> BridgeProtocol.decode(BridgeProtocol.encode(Message.now(Kind.CAPABILITIES, UUID.randomUUID(), "console")), System.currentTimeMillis()));
     }
+    @Test void resultFramesRejectInconsistentOrNestedBodies() {
+        assertThrows(IllegalArgumentException.class, () -> BridgeProtocol.result("executed|EXECUTED|false|1"));
+        assertThrows(IllegalArgumentException.class, () -> BridgeProtocol.result("executed|EXECUTED|true|9999999999"));
+        assertThrows(IllegalArgumentException.class, () -> BridgeProtocol.result("dispatched|DISPATCHED|true||"));
+        assertThrows(IllegalArgumentException.class, () -> BridgeProtocol.result("{{{{{{{{{{{{{{"));
+        assertEquals("executed", BridgeProtocol.result(BridgeProtocol.resultBody(com.commandapi.minecraft.ChatResult.execution(true, 0, 1))).getStage());
+    }
 }

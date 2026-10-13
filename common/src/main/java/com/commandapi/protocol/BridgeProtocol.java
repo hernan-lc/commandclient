@@ -1,6 +1,5 @@
 package com.commandapi.protocol;
 import com.commandapi.minecraft.ChatResult;
-import com.google.gson.*;
 import java.io.*;
 import java.nio.*;
 import java.nio.charset.*;
@@ -46,21 +45,22 @@ public final class BridgeProtocol {
         } catch (IOException e) { throw new IllegalArgumentException("Malformed payload"); }
     }
     public static String resultBody(ChatResult result) {
-        JsonObject body = new JsonObject(); body.addProperty("stage", result.getStage()); body.addProperty("code", result.getCode());
-        body.addProperty("success", result.isSuccess()); if (result.getReturnValue() != null) body.addProperty("value", result.getReturnValue());
-        return body.toString();
+        return result.getStage() + "|" + result.getCode() + "|" + result.isSuccess() + "|"
+                + (result.getReturnValue() == null ? "" : result.getReturnValue());
     }
     public static ChatResult result(String body) {
-        try {
-            JsonObject json = new Gson().fromJson(body, JsonObject.class);
-            String stage = json.get("stage").getAsString(), code = json.get("code").getAsString();
-            if (!code.matches("[A-Z_]{1,64}")) throw new IllegalArgumentException();
-            if (stage.equals("dispatched")) return ChatResult.ok("Server command dispatched; effect is not confirmed");
-            if (stage.equals("unknown")) return ChatResult.unknown("Server execution outcome unknown", code);
-            if (stage.equals("failed")) return ChatResult.failure("Server rejected command", code);
-            if (stage.equals("executed") && json.has("value")) return ChatResult.execution(true, json.get("value").getAsInt(), 1);
-            throw new IllegalArgumentException();
-        } catch (RuntimeException e) { throw new IllegalArgumentException("Invalid execution result"); }
+        if (body == null || body.length() > 128) throw new IllegalArgumentException("Invalid execution result");
+        String[] fields = body.split("\\|", -1);
+        if (fields.length != 4 || !fields[1].matches("[A-Z_]{1,64}")) throw new IllegalArgumentException("Invalid execution result");
+        String stage = fields[0], code = fields[1];
+        if (stage.equals("dispatched") && fields[2].equals("true") && fields[3].isEmpty()) return ChatResult.ok("Server command dispatched; effect is not confirmed");
+        if (stage.equals("unknown") && fields[2].equals("false") && fields[3].isEmpty()) return ChatResult.unknown("Server execution outcome unknown", code);
+        if (stage.equals("failed") && fields[2].equals("false") && fields[3].isEmpty()) return ChatResult.failure("Server rejected command", code);
+        if (stage.equals("executed") && fields[2].equals("true") && fields[3].matches("-?[0-9]{1,10}")) {
+            try { return ChatResult.execution(true, Integer.parseInt(fields[3]), 1); }
+            catch (NumberFormatException error) { throw new IllegalArgumentException("Invalid execution result"); }
+        }
+        throw new IllegalArgumentException("Invalid execution result");
     }
     private BridgeProtocol() { }
 }

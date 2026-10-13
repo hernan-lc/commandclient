@@ -56,4 +56,17 @@ class CommandSchedulerTest {
             assertEquals("unknown", work.results().get(0).get("execution_status").getAsString()); assertEquals(1, bridge.sends);
         }
     }
+    @Test void failedSessionReadCannotLeaveJobRunningForever() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        MinecraftBridge bridge = new MinecraftBridge() {
+            public boolean isInWorld() { return true; } public String getPlayerName() { return "p"; }
+            public Object sessionIdentity() { if (calls.incrementAndGet() > 1) throw new IllegalStateException(); return "p"; }
+            public ChatResult sendChat(String text) { fail("must not dispatch"); return null; }
+        };
+        try (CommandScheduler scheduler = new CommandScheduler(bridge, limits(2, 2))) {
+            CommandScheduler.Work work = scheduler.submit(Arrays.asList("/one")); work.await(2);
+            assertEquals("failed", work.snapshot().get("state").getAsString());
+            assertEquals(1, scheduler.status().get("failed_commands").getAsInt());
+        }
+    }
 }

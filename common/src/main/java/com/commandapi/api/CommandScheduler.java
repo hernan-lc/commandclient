@@ -14,6 +14,8 @@ public final class CommandScheduler implements AutoCloseable {
     private final ThreadPoolExecutor workers;
     private final LinkedHashMap<String, Work> retained = new LinkedHashMap<>();
     private final AtomicInteger queuedCommands = new AtomicInteger(), active = new AtomicInteger();
+    private final AtomicInteger processed = new AtomicInteger(), failedCommands = new AtomicInteger();
+    private volatile String lastError;
     private final ScheduledExecutorService cleanup;
     private boolean closed;
     public CommandScheduler(MinecraftBridge bridge, ApiConfig config) {
@@ -55,6 +57,8 @@ public final class CommandScheduler implements AutoCloseable {
         json.addProperty("max_jobs", config.getMaxJobs());
         json.addProperty("max_queued_commands", config.getMaxQueuedCommands());
         json.addProperty("job_concurrency", config.getJobConcurrency());
+        json.addProperty("processed", processed.get()); json.addProperty("failed_commands", failedCommands.get());
+        if (lastError != null) json.addProperty("last_error", lastError);
         return json;
     }
     private final class Task implements Runnable {
@@ -66,9 +70,9 @@ public final class CommandScheduler implements AutoCloseable {
                 if (!work.begin()) return;
                 for (String text : work.messages) {
                     if (work.token.isCancelled()) break;
-                    if (!Objects.equals(work.session, bridge.sessionIdentity())) { work.cancel("SESSION_CHANGED"); break; }
                     ChatResult result;
                     try {
+                        if (!Objects.equals(work.session, bridge.sessionIdentity())) { work.cancel("SESSION_CHANGED"); break; }
                         CompletableFuture<ChatResult> pending = bridge.submitChat(text, work.session, work.token);
                         result = pending.get(config.getExecutionTimeoutSeconds(), TimeUnit.SECONDS);
                     } catch (TimeoutException error) {
@@ -78,7 +82,8 @@ public final class CommandScheduler implements AutoCloseable {
                         work.token.cancel(); Thread.currentThread().interrupt();
                         result = ChatResult.unknown("Shutdown interrupted the wait; execution may finish", "WAIT_CANCELLED");
                     } catch (Throwable error) { result = ChatResult.failure("Transport failed", "TRANSPORT_FAILED"); }
-                    work.add(text, result);
+                    work.add(text, result); processed.incrementAndGet();
+                    if (!result.isSuccess()) { failedCommands.incrementAndGet(); lastError = result.getCode(); }
                     // Outcome unknown: do not dispatch further non-idempotent commands in this submission.
                     if (result.getStage().equals("unknown")) break;
                 }
