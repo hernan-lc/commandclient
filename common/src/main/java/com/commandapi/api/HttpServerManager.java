@@ -63,6 +63,7 @@ public final class HttpServerManager {
                              String modVersion, String minecraftVersion, Path configDir) {
         this.config = config;
         this.bridge = bridge;
+        bridge.configure(config);
         this.authenticator = new TokenAuthenticator(config);
         this.modVersion = modVersion;
         this.minecraftVersion = minecraftVersion;

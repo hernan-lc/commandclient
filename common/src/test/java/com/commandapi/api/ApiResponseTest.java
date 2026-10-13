@@ -40,7 +40,7 @@ class ApiResponseTest {
                 ApiResponse.chatResult("a", ChatResult.ok("sent")),
                 ApiResponse.chatResult("b", ChatResult.failure("Player not available (not in world?)"))), true);
 
-        assertTrue(response.get("success").getAsBoolean());
+        assertFalse(response.get("success").getAsBoolean());
         assertFalse(response.has("result"));
         assertEquals(2, response.getAsJsonArray("results").size());
         assertFalse(response.getAsJsonArray("results").get(1).getAsJsonObject().get("success").getAsBoolean());

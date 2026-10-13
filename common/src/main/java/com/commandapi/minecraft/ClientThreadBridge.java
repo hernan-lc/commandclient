@@ -20,6 +20,10 @@ import java.util.concurrent.TimeoutException;
  */
 public abstract class ClientThreadBridge implements MinecraftBridge {
 
+    private volatile com.commandapi.config.ApiConfig configuration = com.commandapi.config.ApiConfig.defaults();
+    @Override public void configure(com.commandapi.config.ApiConfig config) { configuration = config; }
+    protected final boolean elevatedSingleplayer() { return configuration.isElevatedSingleplayer(); }
+
     /** How long an HTTP request waits for the client thread to run the send. */
     private static final long TIMEOUT_SECONDS = 5;
 
@@ -46,16 +50,18 @@ public abstract class ClientThreadBridge implements MinecraftBridge {
                     CompletableFuture.completedFuture(ChatResult.failure("Client thread unavailable")),
                     error -> CompletableFuture.completedFuture(ChatResult.failure(error)));
             if (nativeResult != null) {
-                try { return nativeResult.get(30, TimeUnit.SECONDS); }
+                if (isClientThread() && !nativeResult.isDone())
+                    return ChatResult.accepted("Native command queued; server thread will process it");
+                try { return nativeResult.get(configuration.getExecutionTimeoutSeconds(), TimeUnit.SECONDS); }
                 catch (TimeoutException e) {
                     nativeResult.cancel(false);
-                    return ChatResult.failure("Native command timed out; an already running command may finish");
+                    return ChatResult.unknown("Native command timed out; do not retry automatically", "EXECUTION_TIMEOUT");
                 }
                 catch (InterruptedException e) {
                     nativeResult.cancel(false);
                     Thread.currentThread().interrupt();
-                    return ChatResult.failure("Native execution interrupted; an already running command may finish");
-                } catch (ExecutionException e) { return ChatResult.failure("Native execution failed: " + e.getCause()); }
+                    return ChatResult.unknown("Native wait cancelled; an already running command may finish", "WAIT_CANCELLED");
+                } catch (ExecutionException e) { return ChatResult.failure("Native execution failed", "DISPATCH_EXCEPTION"); }
             }
         }
         return onClientThread(() -> session != null && !java.util.Objects.equals(session, sessionIdentity())

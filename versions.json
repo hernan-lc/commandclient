@@ -49,7 +49,12 @@
       "adapterFamily": "network-chat",
       "tier": "A",
       "runtimeVerified": false,
-      "module": "versions:26.3"
+      "module": "versions:26.3",
+      "native": {
+        "permissions": "set",
+        "entrypoint": "performPrefixedCommand",
+        "callback": "result"
+      }
     },
     "26.2": {
       "minecraft": "26.2",
@@ -60,7 +65,12 @@
       "adapterFamily": "network-chat",
       "tier": "B",
       "runtimeVerified": false,
-      "module": "versions:26.2"
+      "module": "versions:26.2",
+      "native": {
+        "permissions": "set",
+        "entrypoint": "performPrefixedCommand",
+        "callback": "result"
+      }
     },
     "26.1": {
       "minecraft": "26.1",
@@ -72,7 +82,12 @@
       "tier": "B",
       "runtimeVerified": false,
       "module": "versions:26.1",
-      "notes": "First unobfuscated release; kept as the boundary marker for the modern build family."
+      "notes": "First unobfuscated release; kept as the boundary marker for the modern build family.",
+      "native": {
+        "permissions": "set",
+        "entrypoint": "performPrefixedCommand",
+        "callback": "result"
+      }
     },
     "1.21.11": {
       "minecraft": "1.21.11",
@@ -84,7 +99,12 @@
       "tier": "B",
       "runtimeVerified": false,
       "module": "versions:1.21.11",
-      "notes": "Last obfuscated release; the boundary marker for the legacy build family."
+      "notes": "Last obfuscated release; the boundary marker for the legacy build family.",
+      "native": {
+        "permissions": "set",
+        "entrypoint": "performPrefixedCommand",
+        "callback": "result"
+      }
     },
     "1.21.8": {
       "minecraft": "1.21.8",
@@ -95,7 +115,12 @@
       "adapterFamily": "network-chat",
       "tier": "B",
       "runtimeVerified": false,
-      "module": "versions:1.21.8"
+      "module": "versions:1.21.8",
+      "native": {
+        "permissions": "numeric",
+        "entrypoint": "performPrefixedCommand",
+        "callback": "result"
+      }
     },
     "1.21.4": {
       "minecraft": "1.21.4",
@@ -106,7 +131,12 @@
       "adapterFamily": "network-chat",
       "tier": "B",
       "runtimeVerified": false,
-      "module": "versions:1.21.4"
+      "module": "versions:1.21.4",
+      "native": {
+        "permissions": "numeric",
+        "entrypoint": "performPrefixedCommand",
+        "callback": "result"
+      }
     },
     "1.21.1": {
       "minecraft": "1.21.1",
@@ -117,7 +147,12 @@
       "adapterFamily": "network-chat",
       "tier": "B",
       "runtimeVerified": false,
-      "module": "versions:1.21.1"
+      "module": "versions:1.21.1",
+      "native": {
+        "permissions": "numeric",
+        "entrypoint": "performPrefixedCommand",
+        "callback": "result"
+      }
     },
     "1.20.6": {
       "minecraft": "1.20.6",
@@ -128,7 +163,12 @@
       "adapterFamily": "network-chat",
       "tier": "C",
       "runtimeVerified": false,
-      "module": "versions:1.20.6"
+      "module": "versions:1.20.6",
+      "native": {
+        "permissions": "numeric",
+        "entrypoint": "performPrefixedCommand",
+        "callback": "result"
+      }
     },
     "1.20.4": {
       "minecraft": "1.20.4",
@@ -139,7 +179,12 @@
       "adapterFamily": "network-chat",
       "tier": "D",
       "runtimeVerified": false,
-      "module": "versions:1.20.4"
+      "module": "versions:1.20.4",
+      "native": {
+        "permissions": "numeric",
+        "entrypoint": "performPrefixedCommand",
+        "callback": "result"
+      }
     },
     "1.20.1": {
       "minecraft": "1.20.1",
@@ -150,7 +195,12 @@
       "adapterFamily": "network-chat",
       "tier": "C",
       "runtimeVerified": false,
-      "module": "versions:1.20.1"
+      "module": "versions:1.20.1",
+      "native": {
+        "permissions": "numeric",
+        "entrypoint": "performPrefixedCommand",
+        "callback": "brigadier"
+      }
     },
     "1.19.4": {
       "minecraft": "1.19.4",
@@ -161,7 +211,12 @@
       "adapterFamily": "network-chat",
       "tier": "D",
       "runtimeVerified": false,
-      "module": "versions:1.19.4"
+      "module": "versions:1.19.4",
+      "native": {
+        "permissions": "numeric",
+        "entrypoint": "performPrefixedCommand",
+        "callback": "brigadier"
+      }
     },
     "1.19.2": {
       "minecraft": "1.19.2",
@@ -172,7 +227,12 @@
       "adapterFamily": "signed-chat",
       "tier": "C",
       "runtimeVerified": false,
-      "module": "versions:1.19.2"
+      "module": "versions:1.19.2",
+      "native": {
+        "permissions": "numeric",
+        "entrypoint": "performPrefixedCommand",
+        "callback": "brigadier"
+      }
     },
     "1.18.2": {
       "minecraft": "1.18.2",
@@ -183,7 +243,12 @@
       "adapterFamily": "legacy-chat",
       "tier": "C",
       "runtimeVerified": false,
-      "module": "versions:1.18.2"
+      "module": "versions:1.18.2",
+      "native": {
+        "permissions": "numeric",
+        "entrypoint": "performCommand",
+        "callback": "brigadier"
+      }
     },
     "1.16.5": {
       "minecraft": "1.16.5",
@@ -195,7 +260,12 @@
       "tier": "C",
       "runtimeVerified": false,
       "module": "versions:1.16.5",
-      "notes": "Fabric Loader 0.15+ requires Java 17, so Java 8 targets pin the 0.14.x line."
+      "notes": "Fabric Loader 0.15+ requires Java 17, so Java 8 targets pin the 0.14.x line.",
+      "native": {
+        "permissions": "numeric",
+        "entrypoint": "performCommand",
+        "callback": "brigadier"
+      }
     },
     "1.16.1": {
       "minecraft": "1.16.1",
@@ -206,7 +276,12 @@
       "adapterFamily": "legacy-chat",
       "tier": "D",
       "runtimeVerified": false,
-      "module": "versions:1.16.1"
+      "module": "versions:1.16.1",
+      "native": {
+        "permissions": "numeric",
+        "entrypoint": "performCommand",
+        "callback": "brigadier"
+      }
     }
   }
 }

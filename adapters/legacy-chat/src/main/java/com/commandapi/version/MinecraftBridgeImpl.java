@@ -44,7 +44,7 @@ public final class MinecraftBridgeImpl extends ClientThreadBridge {
 
     @Override
     protected java.util.concurrent.CompletableFuture<ChatResult> nativeCommand(String text) {
-        return NativeCommands.submit(text);
+        return NativeCommands.submit(text, elevatedSingleplayer());
     }
 
     @Override

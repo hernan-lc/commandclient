@@ -1,0 +1,55 @@
+package com.commandapi.version;
+
+import com.commandapi.minecraft.ChatResult;
+import com.commandapi.minecraft.ExecutionFeedback;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.client.Minecraft;
+
+/** Generated exclusively from versions.json capabilities. Called on the client thread. */
+public final class NativeCommands {
+    private static volatile Object currentSession;
+    public static void observeSession(Object connection) { currentSession = connection; }
+    public static CompletableFuture<ChatResult> submit(String text, boolean elevated) {
+        Minecraft client = Minecraft.getInstance();
+        if (!client.isLocalServer() || client.getSingleplayerServer() == null) return null;
+        CompletableFuture<ChatResult> result = new CompletableFuture<>();
+        if (client.player == null) {
+            result.complete(ChatResult.failure("Player unavailable", "SESSION_UNAVAILABLE"));
+            return result;
+        }
+        Object session = client.player.connection;
+        observeSession(session);
+        net.minecraft.server.MinecraftServer server = client.getSingleplayerServer();
+        java.util.UUID playerId = client.player.getUUID();
+        try {
+            server.execute(() -> {
+                if (result.isDone()) return;
+                if (currentSession != session || !server.isRunning()) {
+                    result.complete(ChatResult.failure("Singleplayer session ended", "SESSION_CHANGED")); return;
+                }
+                try {
+                    net.minecraft.server.level.ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+                    if (player == null) {
+                        result.complete(ChatResult.failure("Player unavailable", "SESSION_CHANGED")); return;
+                    }
+                    net.minecraft.commands.CommandSourceStack source = player.createCommandSourceStack();
+                    if (elevated) source = source.withPermission(${permission});
+                    ExecutionFeedback feedback = new ExecutionFeedback();
+                    source = source.withCallback(${callback});
+                    com.mojang.brigadier.ParseResults<net.minecraft.commands.CommandSourceStack> parsed =
+                            server.getCommands().getDispatcher().parse(text.substring(1), source);
+                    if (parsed.getReader().canRead() || !parsed.getExceptions().isEmpty()) {
+                        result.complete(ChatResult.failure("Invalid command or insufficient permission", "COMMAND_REJECTED")); return;
+                    }
+                    server.getCommands().${execute};
+                    result.complete(feedback.result());
+                } catch (Throwable error) {
+                    result.complete(ChatResult.failure("Native dispatcher failed", "DISPATCH_EXCEPTION"));
+                }
+            });
+        } catch (RuntimeException error) {
+            result.complete(ChatResult.failure("Integrated server unavailable", "SERVER_UNAVAILABLE"));
+        }
+        return result;
+    }
+}

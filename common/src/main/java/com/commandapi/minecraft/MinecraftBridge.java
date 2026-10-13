@@ -29,6 +29,8 @@ public interface MinecraftBridge {
                 : ChatResult.failure("Session changed");
     }
 
+    default void configure(com.commandapi.config.ApiConfig config) { }
+
     default String executionMode() { return "client-chat"; }
 
     /** Stable identity for the current connection; jobs cannot cross sessions. */

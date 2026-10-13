@@ -22,6 +22,7 @@ public final class ApiResponse {
         JsonObject error = new JsonObject();
         error.addProperty("error", message);
         error.addProperty("status", statusCode);
+        error.addProperty("code", "HTTP_" + statusCode);
         return error;
     }
 
@@ -31,6 +32,10 @@ public final class ApiResponse {
         json.addProperty("text", text);
         json.addProperty("success", result.isSuccess());
         json.addProperty("output", result.getMessage());
+        json.addProperty("execution_status", result.getStage());
+        json.addProperty("code", result.getCode());
+        if (result.getReturnValue() != null) json.addProperty("return_value", result.getReturnValue());
+        json.addProperty("result_callbacks", result.getCallbacks());
         return json;
     }
 
@@ -49,7 +54,7 @@ public final class ApiResponse {
         } else {
             response.add("result", results.get(0));
         }
-        response.addProperty("success", true);
+        response.addProperty("success", results.stream().allMatch(result -> result.get("success").getAsBoolean()));
         return response;
     }
 
