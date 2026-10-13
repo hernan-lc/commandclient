@@ -1,0 +1,77 @@
+{
+  "minecraft": "26.3",
+  "mode": "singleplayer-native",
+  "unauthenticated_status": 401,
+  "native_valid": {
+    "result": {
+      "text": "/time set day",
+      "success": true,
+      "output": "Command execution confirmed",
+      "execution_status": "executed",
+      "code": "EXECUTED",
+      "return_value": 145000,
+      "result_callbacks": 1
+    },
+    "success": true
+  },
+  "native_invalid": {
+    "result": {
+      "text": "/commandapi_nonexistent_command",
+      "success": false,
+      "output": "Invalid command or insufficient permission",
+      "execution_status": "failed",
+      "code": "COMMAND_REJECTED",
+      "result_callbacks": 0
+    },
+    "success": false
+  },
+  "async_job": {
+    "id": "4e228646-feb4-4ab1-9d46-71fa5c7a844c",
+    "state": "completed",
+    "total": 2,
+    "processed": 2,
+    "failed_commands": 0,
+    "results": [
+      {
+        "text": "/time set day",
+        "success": true,
+        "output": "Command execution confirmed",
+        "execution_status": "executed",
+        "code": "EXECUTED",
+        "return_value": 169000,
+        "result_callbacks": 1
+      },
+      {
+        "text": "/weather clear",
+        "success": true,
+        "output": "Command execution confirmed",
+        "execution_status": "executed",
+        "code": "EXECUTED",
+        "return_value": -1,
+        "result_callbacks": 1
+      }
+    ]
+  },
+  "capabilities": {
+    "protocol_version": 1,
+    "server_plugin": "unavailable",
+    "diagnostic": "NOT_CONNECTED",
+    "console": false,
+    "pending_requests": 0,
+    "singleplayer_native": true,
+    "async_jobs": true,
+    "elevated_singleplayer": true,
+    "active_transport": "singleplayer-native"
+  },
+  "checks": [
+    "authenticated status",
+    "unauthenticated privileged rejection",
+    "confirmed native execution",
+    "invalid native command",
+    "async ordered completion",
+    "native execution with cheats disabled"
+  ],
+  "recorded_utc": "2026-10-13T13:47:47Z",
+  "cheats_enabled": false,
+  "code_commit": "0466a4cd8e737323ab700a7d402e14fa8403f965"
+}

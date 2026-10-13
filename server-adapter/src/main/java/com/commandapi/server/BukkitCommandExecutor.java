@@ -40,8 +40,10 @@ final class BukkitCommandExecutor implements MinecraftBridge, ServerCommandExecu
     @Override public String executionMode() { return "server-native-" + (settings.console ? "console" : "player"); }
     @Override public ChatResult sendChat(String text) {
         if (Bukkit.isPrimaryThread()) return ChatResult.failure("Use asynchronous submission on the server thread", "THREAD_OWNERSHIP");
-        try { return submitChat(text, sessionIdentity(), new CancellationToken()).get(settings.api.getExecutionTimeoutSeconds(), TimeUnit.SECONDS); }
-        catch (Exception e) { return ChatResult.unknown("Execution completion unavailable", "OUTCOME_UNKNOWN"); }
+        CancellationToken token = new CancellationToken();
+        try { return submitChat(text, sessionIdentity(), token).get(settings.api.getExecutionTimeoutSeconds(), TimeUnit.SECONDS); }
+        catch (InterruptedException e) { token.cancel(); Thread.currentThread().interrupt(); return ChatResult.unknown("Wait interrupted", "WAIT_CANCELLED"); }
+        catch (Exception e) { token.cancel(); return ChatResult.unknown("Execution completion unavailable", "OUTCOME_UNKNOWN"); }
     }
     @Override public CompletableFuture<ChatResult> submitChat(String text, Object session, CancellationToken token) {
         if (closed) return CompletableFuture.completedFuture(ChatResult.failure("Plugin disabled", "SHUTDOWN"));

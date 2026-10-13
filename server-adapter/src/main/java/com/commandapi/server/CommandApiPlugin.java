@@ -13,10 +13,10 @@ public final class CommandApiPlugin extends JavaPlugin implements org.bukkit.eve
     @Override public void onEnable() {
         try {
             saveDefaultConfig();
-            if (getConfig().getString("token", "").isEmpty()) { getConfig().set("token", ApiConfig.newToken()); saveConfig(); }
             java.nio.file.Path configPath = getDataFolder().toPath().resolve("config.yml");
             if (java.nio.file.Files.getFileStore(configPath).supportsFileAttributeView("posix"))
                 java.nio.file.Files.setPosixFilePermissions(configPath, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+            if (getConfig().getString("token", "").isEmpty()) { getConfig().set("token", ApiConfig.newToken()); saveConfig(); }
             ServerSettings settings = new ServerSettings(getConfig());
             executor = new BukkitCommandExecutor(this, settings);
             messages = new PluginMessageBridge(this, executor);

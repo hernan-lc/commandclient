@@ -198,7 +198,10 @@ public final class HttpServerManager {
                             + ApiLimits.MAX_BODY_BYTES + " bytes");
                 }
             }
-            return new String(baos.toByteArray(), StandardCharsets.UTF_8);
+            try {
+                return StandardCharsets.UTF_8.newDecoder().onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                        .decode(java.nio.ByteBuffer.wrap(baos.toByteArray())).toString();
+            } catch (java.nio.charset.CharacterCodingException error) { throw new ApiRequestException("Request body is not valid UTF-8"); }
         }
     }
 
