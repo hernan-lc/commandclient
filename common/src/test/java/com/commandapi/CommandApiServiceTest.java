@@ -160,7 +160,7 @@ class CommandApiServiceTest {
             assertEquals(oldConfig.getPort(), ConfigLoader.load(dir).getPort());
             int restoredPort = service.getHttpServerManager().getPort();
             assertEquals(restoredPort, addressPort(dir));
-            assertEquals(200, statusCode(restoredPort));
+            assertEquals(401, statusCode(restoredPort));
             assertTrue(oldPort > 0);
         } finally {
             service.stop();
@@ -196,6 +196,8 @@ class CommandApiServiceTest {
             HttpURLConnection connection = (HttpURLConnection) new URL("http://127.0.0.1:"
                     + service.getHttpServerManager().getPort() + "/api/chat").openConnection();
             connection.setRequestMethod("POST");
+            connection.setRequestProperty("Authorization", "Bearer " + service.getConfig().getToken());
+            connection.setRequestProperty("Content-Type", "application/json");
             connection.setDoOutput(true);
             byte[] body = "{\"text\":\"/time set day\"}".getBytes(StandardCharsets.UTF_8);
             try (OutputStream output = connection.getOutputStream()) {

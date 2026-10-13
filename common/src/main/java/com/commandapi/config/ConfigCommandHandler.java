@@ -279,22 +279,22 @@ public final class ConfigCommandHandler {
     }
 
     private static ApiConfig withPort(ApiConfig current, int port) {
-        return new ApiConfig(current.getHost(), port, current.getToken(),
+        return current.copy(current.getHost(), port, current.getToken(),
                 current.isAuthEnabled(), current.isLoginSummary());
     }
 
     private static ApiConfig withHost(ApiConfig current, String host) {
-        return new ApiConfig(host, current.getPort(), current.getToken(),
+        return current.copy(host, current.getPort(), current.getToken(),
                 current.isAuthEnabled(), current.isLoginSummary());
     }
 
     private static ApiConfig withAuth(ApiConfig current, boolean enabled) {
-        return new ApiConfig(current.getHost(), current.getPort(), current.getToken(),
+        return current.copy(current.getHost(), current.getPort(), current.getToken(),
                 enabled, current.isLoginSummary());
     }
 
     private static ApiConfig withToken(ApiConfig current, String token, boolean authEnabled) {
-        return new ApiConfig(current.getHost(), current.getPort(), token,
+        return current.copy(current.getHost(), current.getPort(), token,
                 authEnabled, current.isLoginSummary());
     }
 

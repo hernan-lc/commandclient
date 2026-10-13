@@ -17,10 +17,16 @@ public final class CommandApiPlugin extends JavaPlugin {
         saveDefaultConfig();
         String token = getConfig().getString("token", "");
         if (token.isEmpty()) {
-            token = UUID.randomUUID().toString() + UUID.randomUUID();
+            token = ApiConfig.newToken();
             getConfig().set("token", token);
             saveConfig();
         }
+        java.nio.file.Path tokenFile = getDataFolder().toPath().resolve("config.yml");
+        try {
+            if (java.nio.file.Files.getFileStore(tokenFile).supportsFileAttributeView("posix"))
+                java.nio.file.Files.setPosixFilePermissions(tokenFile, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+        } catch (java.io.IOException error) { throw new IllegalStateException("Cannot secure plugin config", error); }
+        com.commandapi.security.CommandPolicy policy = new com.commandapi.security.CommandPolicy(getConfig().getStringList("allowed-commands"));
         String mode = getConfig().getString("sender", "player");
         if (!mode.equals("player") && !mode.equals("console")) {
             throw new IllegalArgumentException("sender must be player or console");
@@ -50,6 +56,10 @@ public final class CommandApiPlugin extends JavaPlugin {
                 CommandSender sender = sender();
                 if (sender == null) return ChatResult.failure("Configured player is offline or missing");
                 if (!text.startsWith("/")) return ChatResult.failure("Server adapter accepts slash commands only");
+                if (!policy.allows(text)) return ChatResult.failure("Command denied by server policy");
+                if (sender instanceof org.bukkit.entity.Player && !getConfig().getStringList("allowed-players").isEmpty()
+                        && !getConfig().getStringList("allowed-players").contains(((org.bukkit.entity.Player) sender).getUniqueId().toString()))
+                    return ChatResult.failure("Player denied by server policy");
                 return Bukkit.dispatchCommand(sender, text.substring(1))
                         ? ChatResult.ok("Native command dispatched; command feedback determines outcome")
                         : ChatResult.failure("Command was not dispatched");

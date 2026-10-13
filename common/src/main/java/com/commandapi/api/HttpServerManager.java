@@ -72,6 +72,10 @@ public final class HttpServerManager {
     /** Binds and starts the server. Returns false if the port could not be bound. */
     public boolean start() {
         try {
+            if (config.isExposedBeyondLoopback() && (!config.isAllowRemotePrivileged() || !config.isAuthEnabled())) {
+                System.err.println("[CommandAPI] Remote binding requires authentication and allowRemotePrivileged=true");
+                return false;
+            }
             server = HttpServer.create(new InetSocketAddress(config.getHost(), config.getPort()), 0);
             executor = Executors.newCachedThreadPool(daemonThreadFactory());
             server.setExecutor(executor);
@@ -209,7 +213,8 @@ public final class HttpServerManager {
     }
 
     private boolean authorize(HttpExchange exchange) throws IOException {
-        if (authenticator.isAuthorized(exchange.getRequestHeaders().getFirst("Authorization"))) {
+        if (authenticator.isAuthorized(exchange.getRequestHeaders().getFirst("Authorization"),
+                !exchange.getRequestMethod().equals("GET"))) {
             return true;
         }
         sendError(exchange, 401, "Unauthorized");
@@ -224,6 +229,21 @@ public final class HttpServerManager {
         @Override
         public final void handle(HttpExchange exchange) throws IOException {
             try {
+                String path = exchange.getRequestURI().getRawPath();
+                if (exchange.getRequestHeaders().containsKey("Origin")
+                        || "cross-site".equals(exchange.getRequestHeaders().getFirst("Sec-Fetch-Site"))) {
+                    sendError(exchange, 403, "Browser-origin requests are not supported"); return;
+                }
+                if (!(path.equals("/api/chat") || path.equals("/api/execute") || path.equals("/api/status")
+                        || path.equals("/api/jobs") || path.matches("/api/jobs/[a-f0-9-]{36}"))) {
+                    sendError(exchange, 404, "Unknown endpoint"); return;
+                }
+                if (exchange.getRequestMethod().equals("POST")) {
+                    String type = exchange.getRequestHeaders().getFirst("Content-Type");
+                    if (type == null || !type.split(";", 2)[0].trim().equalsIgnoreCase("application/json")) {
+                        sendError(exchange, 415, "Content-Type must be application/json"); return;
+                    }
+                }
                 handleSafely(exchange);
             } catch (RequestTooLargeException e) {
                 sendError(exchange, 413, e.getMessage());
@@ -247,6 +267,15 @@ public final class HttpServerManager {
         abstract void handleSafely(HttpExchange exchange) throws IOException;
     }
 
+    private boolean authorizeCommands(HttpExchange exchange, ApiRequest request) throws IOException {
+        for (String text : request.getMessages()) {
+            if (!config.getCommandPolicy().allows(text)) {
+                sendError(exchange, 403, "Command denied by configured policy"); return false;
+            }
+        }
+        return true;
+    }
+
     private final class ChatHandler extends SafeHandler {
         @Override
         void handleSafely(HttpExchange exchange) throws IOException {
@@ -260,6 +289,7 @@ public final class HttpServerManager {
             }
 
             ApiRequest request = ApiRequest.parse(readBody(exchange));
+            if (!authorizeCommands(exchange, request)) return;
 
             // Checked before sending so an offline client gets 503 rather than
             // a 200 whose body says every message failed.
@@ -285,6 +315,7 @@ public final class HttpServerManager {
             String method = exchange.getRequestMethod();
             if (path.equals("/api/jobs") && method.equals("POST")) {
                 ApiRequest request = ApiRequest.parse(readBody(exchange));
+            if (!authorizeCommands(exchange, request)) return;
                 if (!bridge.isInWorld()) { sendError(exchange, 503, "Session unavailable"); return; }
                 JsonObject job = jobs.submit(request);
                 if (job == null) { sendError(exchange, 429, "Job capacity reached"); return; }

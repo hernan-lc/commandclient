@@ -5,8 +5,7 @@ import com.commandapi.config.ApiConfig;
 /**
  * Bearer-token check for incoming requests.
  *
- * <p>Authentication is a no-op when disabled or when no token is configured,
- * which preserves the previous default of an open local API.</p>
+ * <p>Read-only authentication may be disabled. Mutating operations always require a token.</p>
  */
 public final class TokenAuthenticator {
 
@@ -20,9 +19,14 @@ public final class TokenAuthenticator {
 
     /** @param authorizationHeader the raw {@code Authorization} header, may be null */
     public boolean isAuthorized(String authorizationHeader) {
-        if (!config.isAuthEnabled() || config.getToken().isEmpty()) {
+        return isAuthorized(authorizationHeader, false);
+    }
+
+    public boolean isAuthorized(String authorizationHeader, boolean mutation) {
+        if (!mutation && !config.isAuthEnabled()) {
             return true;
         }
+        if (config.getToken().isEmpty()) return false;
         if (authorizationHeader == null || !authorizationHeader.startsWith(PREFIX)) {
             return false;
         }

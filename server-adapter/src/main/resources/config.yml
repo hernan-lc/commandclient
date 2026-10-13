@@ -6,3 +6,8 @@ token: ''
 # console explicitly grants the API server-console authority.
 sender: player
 player-uuid: ''
+
+# Empty denies command execution until an administrator selects roots (or '*').
+allowed-commands: []
+# Empty permits any otherwise authorized player. UUID strings only.
+allowed-players: []

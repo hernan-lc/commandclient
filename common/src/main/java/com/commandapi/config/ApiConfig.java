@@ -23,6 +23,14 @@ public final class ApiConfig {
     public static final int MIN_PORT = 0;
     public static final int MAX_PORT = 65535;
 
+    private final boolean allowRemotePrivileged;
+    private final boolean elevatedSingleplayer;
+    private final com.commandapi.security.CommandPolicy commandPolicy;
+    private final int maxJobs, maxQueuedCommands, commandsPerTick, retentionSeconds;
+    private final int httpWorkers;
+    private final int maxHttpQueue;
+    private final int executionTimeoutSeconds;
+    private final int jobConcurrency;
     private final int port;
     private final String host;
     private final String token;
@@ -34,6 +42,26 @@ public final class ApiConfig {
     }
 
     public ApiConfig(String host, int port, String token, boolean authEnabled, boolean loginSummary) {
+        this(host, port, token, authEnabled, loginSummary, false, true,
+                java.util.Collections.singleton("*"), 128, 1024, 16, 600, 8, 64, 30, 1);
+    }
+
+    public ApiConfig(String host, int port, String token, boolean authEnabled, boolean loginSummary,
+                     boolean allowRemotePrivileged, boolean elevatedSingleplayer, java.util.Collection<String> allowed,
+                     int maxJobs, int maxQueuedCommands, int commandsPerTick, int retentionSeconds,
+                     int httpWorkers, int maxHttpQueue, int executionTimeoutSeconds, int jobConcurrency) {
+        if (authEnabled && (token == null || token.trim().isEmpty())) throw new IllegalArgumentException("Authentication requires a nonempty token");
+        if (maxJobs < 1 || maxJobs > 4096 || maxQueuedCommands < 1 || maxQueuedCommands > 65536
+                || commandsPerTick < 1 || commandsPerTick > 1024 || retentionSeconds < 1 || retentionSeconds > 86400
+                || httpWorkers < 1 || httpWorkers > 128 || maxHttpQueue < 1 || maxHttpQueue > 4096
+                || executionTimeoutSeconds < 1 || executionTimeoutSeconds > 300 || jobConcurrency < 1 || jobConcurrency > 8)
+            throw new IllegalArgumentException("Execution limits out of range");
+        this.allowRemotePrivileged = allowRemotePrivileged;
+        this.elevatedSingleplayer = elevatedSingleplayer;
+        this.commandPolicy = new com.commandapi.security.CommandPolicy(allowed);
+        this.maxJobs = maxJobs; this.maxQueuedCommands = maxQueuedCommands; this.commandsPerTick = commandsPerTick;
+        this.retentionSeconds = retentionSeconds; this.httpWorkers = httpWorkers; this.maxHttpQueue = maxHttpQueue;
+        this.executionTimeoutSeconds = executionTimeoutSeconds; this.jobConcurrency = jobConcurrency;
         this.host = host == null ? DEFAULT_HOST : host;
         this.port = normalizePort(port);
         this.token = token == null ? "" : token;
@@ -55,7 +83,29 @@ public final class ApiConfig {
     }
 
     public static ApiConfig defaults() {
-        return new ApiConfig(DEFAULT_HOST, DEFAULT_PORT, "", false);
+        return new ApiConfig(DEFAULT_HOST, DEFAULT_PORT, newToken(), true);
+    }
+
+    public static String newToken() {
+        byte[] bytes = new byte[32];
+        new java.security.SecureRandom().nextBytes(bytes);
+        return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+    public boolean isAllowRemotePrivileged() { return allowRemotePrivileged; }
+    public boolean isElevatedSingleplayer() { return elevatedSingleplayer; }
+    public com.commandapi.security.CommandPolicy getCommandPolicy() { return commandPolicy; }
+    public int getMaxJobs() { return maxJobs; }
+    public int getMaxQueuedCommands() { return maxQueuedCommands; }
+    public int getCommandsPerTick() { return commandsPerTick; }
+    public int getRetentionSeconds() { return retentionSeconds; }
+    public int getHttpWorkers() { return httpWorkers; }
+    public int getMaxHttpQueue() { return maxHttpQueue; }
+    public int getExecutionTimeoutSeconds() { return executionTimeoutSeconds; }
+    public int getJobConcurrency() { return jobConcurrency; }
+    public ApiConfig copy(String host, int port, String token, boolean auth, boolean login) {
+        return new ApiConfig(host, port, token, auth, login, allowRemotePrivileged, elevatedSingleplayer,
+                commandPolicy.commands(), maxJobs, maxQueuedCommands, commandsPerTick, retentionSeconds,
+                httpWorkers, maxHttpQueue, executionTimeoutSeconds, jobConcurrency);
     }
 
     public int getPort() {
