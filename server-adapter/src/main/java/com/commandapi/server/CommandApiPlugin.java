@@ -1,82 +1,38 @@
 package com.commandapi.server;
-
 import com.commandapi.api.HttpServerManager;
-import com.commandapi.config.ApiConfig;
-import com.commandapi.minecraft.ChatResult;
-import com.commandapi.minecraft.ClientThreadBridge;
+import com.commandapi.config.*;
 import org.bukkit.Bukkit;
-import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.java.JavaPlugin;
-import java.util.UUID;
-import java.util.concurrent.Executor;
-
-/** Paper/Spigot adapter; command work is confined to the Bukkit main thread. */
+import org.bukkit.scheduler.BukkitTask;
+/** Owns transports and lifecycle; dispatcher contains no HTTP implementation. */
 public final class CommandApiPlugin extends JavaPlugin {
     private HttpServerManager http;
+    private BukkitCommandExecutor executor;
+    private BukkitTask tick;
     @Override public void onEnable() {
-        saveDefaultConfig();
-        String token = getConfig().getString("token", "");
-        if (token.isEmpty()) {
-            token = ApiConfig.newToken();
-            getConfig().set("token", token);
-            saveConfig();
-        }
-        java.nio.file.Path tokenFile = getDataFolder().toPath().resolve("config.yml");
         try {
-            if (java.nio.file.Files.getFileStore(tokenFile).supportsFileAttributeView("posix"))
-                java.nio.file.Files.setPosixFilePermissions(tokenFile, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
-        } catch (java.io.IOException error) { throw new IllegalStateException("Cannot secure plugin config", error); }
-        com.commandapi.security.CommandPolicy policy = new com.commandapi.security.CommandPolicy(getConfig().getStringList("allowed-commands"));
-        String mode = getConfig().getString("sender", "player");
-        if (!mode.equals("player") && !mode.equals("console")) {
-            throw new IllegalArgumentException("sender must be player or console");
-        }
-        String id = getConfig().getString("player-uuid", "");
-        UUID playerId = id.isEmpty() ? null : UUID.fromString(id);
-        ClientThreadBridge bridge = new ClientThreadBridge() {
-            private CommandSender sender() {
-                return mode.equals("console") ? Bukkit.getConsoleSender()
-                        : playerId == null ? null : Bukkit.getPlayer(playerId);
+            saveDefaultConfig();
+            if (getConfig().getString("token", "").isEmpty()) { getConfig().set("token", ApiConfig.newToken()); saveConfig(); }
+            java.nio.file.Path configPath = getDataFolder().toPath().resolve("config.yml");
+            if (java.nio.file.Files.getFileStore(configPath).supportsFileAttributeView("posix"))
+                java.nio.file.Files.setPosixFilePermissions(configPath, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+            ServerSettings settings = new ServerSettings(getConfig());
+            executor = new BukkitCommandExecutor(this, settings);
+            tick = Bukkit.getScheduler().runTaskTimer(this, executor::tick, 1, 1);
+            if (settings.httpEnabled) {
+                http = new HttpServerManager(settings.api, executor, getDescription().getVersion(), Bukkit.getBukkitVersion(), getDataFolder().toPath());
+                if (!http.start()) throw new IllegalStateException("HTTP endpoint could not start");
+                if (!ConfigLoader.writeAddress(getDataFolder().toPath(), http.getHost(), http.getPort())) throw new IllegalStateException("Address discovery file could not be written");
             }
-            @Override protected Executor clientExecutor() {
-                return task -> Bukkit.getScheduler().runTask(CommandApiPlugin.this, task);
-            }
-            @Override protected boolean isClientThread() { return Bukkit.isPrimaryThread(); }
-            @Override public boolean isInWorld() {
-                return onClientThread(() -> sender() != null, false, error -> false);
-            }
-            @Override public String executionMode() { return "server-native-" + mode; }
-            @Override public Object sessionIdentity() {
-                return onClientThread(() -> sender(), null, error -> null);
-            }
-            @Override public String getPlayerName() {
-                return onClientThread(() -> sender() == null ? null : sender().getName(), null, error -> null);
-            }
-            @Override protected ChatResult sendChatOnClientThread(String text) {
-                CommandSender sender = sender();
-                if (sender == null) return ChatResult.failure("Configured player is offline or missing");
-                if (!text.startsWith("/")) return ChatResult.failure("Server adapter accepts slash commands only");
-                if (!policy.allows(text)) return ChatResult.failure("Command denied by server policy");
-                if (sender instanceof org.bukkit.entity.Player && !getConfig().getStringList("allowed-players").isEmpty()
-                        && !getConfig().getStringList("allowed-players").contains(((org.bukkit.entity.Player) sender).getUniqueId().toString()))
-                    return ChatResult.failure("Player denied by server policy");
-                return Bukkit.dispatchCommand(sender, text.substring(1))
-                        ? ChatResult.ok("Native command dispatched; command feedback determines outcome")
-                        : ChatResult.failure("Command was not dispatched");
-            }
-        };
-        ApiConfig config = new ApiConfig(getConfig().getString("host", "127.0.0.1"),
-                getConfig().getInt("port", 0), token, true, false);
-        http = new HttpServerManager(config, bridge, getDescription().getVersion(), Bukkit.getBukkitVersion(), getDataFolder().toPath());
-        if (!http.start()) {
-            getLogger().severe("Unable to start Command API");
-            Bukkit.getPluginManager().disablePlugin(this);
-        } else {
-            com.commandapi.config.ConfigLoader.writeAddress(getDataFolder().toPath(), http.getHost(), http.getPort());
+        } catch (Exception error) {
+            getLogger().severe("CommandAPI startup rejected: " + (error instanceof IllegalArgumentException ? error.getMessage() : error.getClass().getSimpleName()));
+            onDisable(); Bukkit.getPluginManager().disablePlugin(this);
         }
     }
     @Override public void onDisable() {
-        if (http != null) http.stop();
-        com.commandapi.config.ConfigLoader.deleteAddress(getDataFolder().toPath());
+        if (http != null) { http.stop(); http = null; }
+        if (tick != null) { tick.cancel(); tick = null; }
+        if (executor != null) { executor.close(); executor = null; }
+        ConfigLoader.deleteAddress(getDataFolder().toPath());
     }
 }

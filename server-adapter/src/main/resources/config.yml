@@ -1,13 +1,19 @@
+# Optional independent administrator HTTP API. Client integration does not use this token.
+http-enabled: false
 host: 127.0.0.1
 port: 0
-# Generated on first startup. Authentication is always enabled.
 token: ''
-# player preserves the selected player's permissions and location.
-# console explicitly grants the API server-console authority.
+allow-remote-privileged: false
 sender: player
 player-uuid: ''
-
-# Empty denies command execution until an administrator selects roots (or '*').
+console-enabled: false
+# Exact root names, including namespaces. Empty denies all; '*' is an explicit broad grant.
 allowed-commands: []
-# Empty permits any otherwise authorized player. UUID strings only.
 allowed-players: []
+commands-per-tick: 8
+max-jobs: 128
+max-queued-commands: 1024
+retention-seconds: 600
+http-workers: 4
+max-http-queue: 32
+execution-timeout-seconds: 30

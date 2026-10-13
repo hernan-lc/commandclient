@@ -3,3 +3,7 @@ version: '${version}'
 main: com.commandapi.server.CommandApiPlugin
 api-version: '1.21'
 description: Native authenticated HTTP command execution and asynchronous jobs.
+permissions:
+  commandapi.execute:
+    description: Use the native player command bridge with existing player permissions.
+    default: false
