@@ -373,5 +373,8 @@
         "disconnectMethod": "clearLevel(Lnet/minecraft/client/gui/screens/Screen;)V"
       }
     }
+  },
+  "sharedLibraries": {
+    "gson": "2.8.0"
   }
 }

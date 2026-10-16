@@ -9,6 +9,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /** Shared bounded scheduler for sync/async submissions. Minecraft threads never wait for HTTP. */
 public final class CommandScheduler implements AutoCloseable {
+    private static final Gson GSON = new Gson();
+    private static JsonObject copyResult(JsonObject value) { return GSON.fromJson(value.toString(), JsonObject.class); }
     private final MinecraftBridge bridge;
     private final ApiConfig config;
     private final ThreadPoolExecutor workers;
@@ -131,13 +133,13 @@ public final class CommandScheduler implements AutoCloseable {
         }
         public void await(int seconds) throws InterruptedException, ExecutionException, TimeoutException { completion.get(seconds, TimeUnit.SECONDS); }
         public synchronized List<JsonObject> results() {
-            List<JsonObject> copy = new ArrayList<>(); results.forEach(value -> copy.add(value.deepCopy())); return copy;
+            List<JsonObject> copy = new ArrayList<>(); results.forEach(value -> copy.add(copyResult(value))); return copy;
         }
         public synchronized JsonObject snapshot() {
             JsonObject json = new JsonObject(); json.addProperty("id", id); json.addProperty("state", state);
             json.addProperty("total", messages.size()); json.addProperty("processed", results.size());
             json.addProperty("failed_commands", failures); if (lastError != null) json.addProperty("last_error", lastError);
-            JsonArray array = new JsonArray(); results.forEach(value -> array.add(value.deepCopy())); json.add("results", array);
+            JsonArray array = new JsonArray(); results.forEach(value -> array.add(copyResult(value))); json.add("results", array);
             return json;
         }
     }

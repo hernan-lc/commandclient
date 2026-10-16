@@ -69,4 +69,17 @@ class CommandSchedulerTest {
             assertEquals(1, scheduler.status().get("failed_commands").getAsInt());
         }
     }
+    @Test void resultsAreDefensiveCopiesWithTheOldestRuntimeGson() throws Exception {
+        MinecraftBridge bridge = new MinecraftBridge() {
+            public boolean isInWorld() { return true; } public String getPlayerName() { return "p"; }
+            public ChatResult sendChat(String text) { return ChatResult.ok("sent"); }
+        };
+        try (CommandScheduler scheduler = new CommandScheduler(bridge, limits(2, 2))) {
+            CommandScheduler.Work work = scheduler.submit(Arrays.asList("/one")); work.await(2);
+            work.results().get(0).addProperty("success", false);
+            work.snapshot().getAsJsonArray("results").get(0).getAsJsonObject().addProperty("success", false);
+            assertTrue(work.results().get(0).get("success").getAsBoolean());
+            assertEquals("completed", work.snapshot().get("state").getAsString());
+        }
+    }
 }
