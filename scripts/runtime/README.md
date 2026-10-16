@@ -33,3 +33,19 @@ Use existing accepted Minecraft EULA terms before running any temporary server.
 Bind test servers to loopback and keep all bearer tokens in private temporary
 config files. Run scripts/runtime-smoke.py for native JSON evidence. The HTTP
 example has a separately executable Node test.
+
+`server-http-smoke.py` tests a running isolated Paper server with administrator
+console HTTP explicitly enabled and allowed roots `time` and `weather`. It
+requires the corresponding built variant JAR, reads the generated token without
+printing it, checks missing authentication and denied commands, then records
+native dispatch and asynchronous completion. Example:
+
+```sh
+python3 scripts/runtime/server-http-smoke.py /tmp/test-server/plugins/CommandApiBridge \
+  --artifact build/server-distributions/commandapi-server-legacy-1.3.2.jar \
+  --target legacy --paper-build 794 --output /tmp/legacy-smoke.json
+```
+
+This only verifies the recorded server version and HTTP paths. A client-plugin
+handshake requires an actual matching Minecraft client session. The script
+changes time/weather in the test world; never target a production server.
