@@ -118,3 +118,35 @@ was dispatched against this branch. GitHub rejected jobs before any steps ran:
 This is an external account/billing blocker, not a passing CI run. No billing
 settings or spending limits were changed. The repository owner must resolve
 the account issue before hosted checks can execute.
+
+## Legacy and modern server variants (2026-10-16)
+
+Both variants now compile identical server sources against their declared
+minimum Spigot API. `versions.json.serverTargets` is the authoritative metadata:
+
+| Variant | Target server range | Compile API | Java bytecode | Actual runtime anchor |
+|---|---|---|---|---|
+| legacy | 1.16.5–1.20.6 | Spigot 1.16.5 | Java 8 | Paper 1.16.5 build 794, Java 16 |
+| modern | 1.21–26.3 | Spigot 1.21.1 | Java 21 | Paper 26.3 build 180, Java 25 |
+
+The server suite ran twice: eight tests against the modern API and eight
+against legacy. Four Python packaging regression tests passed, including
+rejection of a modern common class inside the legacy JAR, wrong API metadata,
+and a legacy JAR mislabelled as modern. The verifier checks every class's Java
+level, not only the plugin entrypoint. Generated release collection contains
+exactly the two variant JARs and their manifest, without the superseded single
+artifact. CI and release commands require both variants and both test suites.
+
+The legacy runtime HTTP smoke record is
+[paper-1.16.5-legacy.json](../runtime-evidence/paper-1.16.5-legacy.json).
+The modern variant's current packaging is exercised separately in
+[paper-26.3-modern.json](../runtime-evidence/paper-26.3-modern.json).
+Each checks standalone loading, authenticated console HTTP, missing-token
+rejection, root-policy denial, native dispatch and ordered async completion.
+These use isolated, administrator-configured console endpoints and contain no
+tokens. Shutdown is checked for endpoint release and address-file removal.
+
+These anchor runs do not prove every intermediate Paper version or Spigot
+runtime. Client-plugin handshake evidence remains the previously recorded
+26.3 run; the legacy client-to-server handshake is not newly runtime-verified.
+The earlier GitHub billing blocker still prevents claiming hosted CI success.

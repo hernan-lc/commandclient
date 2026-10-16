@@ -3,7 +3,8 @@
 Compilation, integration tests using fake bridges, and actual Minecraft runtime
 are separate evidence. Current scope and results are recorded in
 [implementation verification](IMPLEMENTATION_VERIFICATION.md). The 1.16.1 and 26.3 native smoke records and Paper 26.3 integration record
-come from actual running games. The remaining runtime matrix is not verified.
+come from actual running games. Separate server-variant HTTP smoke records
+cover legacy Paper 1.16.5 and modern Paper 26.3 packaging. The remaining runtime matrix is not verified.
 
 Full `runtimeVerified` flags remain false until all relevant checks below run
 for that exact version. Never infer runtime support from another version in

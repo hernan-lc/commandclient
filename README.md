@@ -252,7 +252,9 @@ version matches the game exactly — `commandapi-…+mc1.21.11.jar` will not loa
 
 ## Paper/Spigot and async setup
 
-Install the separate `commandapi-server` JAR into `plugins/`. The default plugin
+Install one server JAR into `plugins/`: `commandapi-server-legacy` for
+1.16.5–1.20.6 or `commandapi-server-modern` for 1.21–26.3. Both share the same
+configuration; replace the old JAR when switching variants. The default plugin
 policy denies commands and its `commandapi.execute` permission defaults to false.
 Grant access explicitly and configure permitted roots. Client discovery then
 uses the existing client HTTP URL; no server token is transmitted to the client.

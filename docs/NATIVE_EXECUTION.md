@@ -77,9 +77,19 @@ Its Location header allows inspecting the corresponding job.
 ## Installing Paper/Spigot
 
 Build with `./gradlew :server-adapter:build`, or get the distinct server release
-artifact. Put `commandapi-server-<version>.jar` in `plugins/` and restart.
-The plugin targets Bukkit API 1.21 and Java 21+, packages the shared core, and
-uses Gson supplied by Minecraft/Bukkit. It does not package Bukkit, Fabric,
+artifacts. Install **one** variant in `plugins/` and restart:
+
+| Server range | JAR | Compiled API | Plugin bytecode |
+|---|---|---|---|
+| Paper/Spigot 1.16.5–1.20.6 | `commandapi-server-legacy-<version>.jar` | Spigot 1.16.5 / api-version 1.16 | Java 8 |
+| Paper/Spigot 1.21–26.3 | `commandapi-server-modern-<version>.jar` | Spigot 1.21.1 / api-version 1.21 | Java 21 |
+
+The server itself still requires its appropriate Java runtime; Java 8 bytecode
+does not mean that newer Paper releases can run on Java 8. Both variants use
+the same plugin name and configuration directory. When upgrading across the
+boundary, replace the previous JAR; never install both together. Source code,
+HTTP routes, protocol, permissions and security policy are identical. Both
+package the shared core and use Gson supplied by Minecraft/Bukkit. It does not package Bukkit, Fabric,
 Gson or test dependencies. Folia is unsupported. Compilation is separate from
 runtime compatibility evidence.
 

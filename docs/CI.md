@@ -93,3 +93,8 @@ tests, packaging verification and standalone artifact upload. Aggregation
 requires shared tests, server tests and all Fabric matrix builds to succeed.
 Hosted CI does not certify runtime compatibility; see
 [implementation evidence](IMPLEMENTATION_VERIFICATION.md).
+
+The server build now compiles identical sources against both Spigot baselines
+and runs the same test suite twice (`test`, `legacyTest`). Both test reports and
+both installable artifacts are uploaded. Verification rejects a missing variant
+or any bundled class above its declared Java baseline.
