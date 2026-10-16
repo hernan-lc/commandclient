@@ -107,3 +107,14 @@ remain compile-verified only until their individual runtime checks run.
 The JVM shutdown hook now uses the normal stop path to cancel jobs, release
 workers and close the listener. Its regression test invokes that same hook and
 checks the port, job state and non-interruption of the pending dispatcher.
+
+## Hosted CI attempt
+
+On 2026-10-16 repository Actions were found disabled and enabled for the
+requested validation. Build run
+[38899962768](https://github.com/nglmercer/commandclient/actions/runs/38899962768)
+was dispatched against this branch. GitHub rejected jobs before any steps ran:
+“The job was not started because your account is locked due to a billing issue.”
+This is an external account/billing blocker, not a passing CI run. No billing
+settings or spending limits were changed. The repository owner must resolve
+the account issue before hosted checks can execute.
