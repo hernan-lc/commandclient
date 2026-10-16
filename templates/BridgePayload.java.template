@@ -1,0 +1,16 @@
+package com.commandapi.version;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.${identifier};
+public final class BridgePayload implements CustomPacketPayload {
+    public final ${identifier} identifier;
+    public final byte[] bytes;
+    public BridgePayload(String channel, byte[] bytes) { this.identifier = ${factory}; this.bytes = bytes.clone(); }
+    public BridgePayload(${identifier} identifier, byte[] bytes) { this.identifier = identifier; this.bytes = bytes.clone(); }
+    public static byte[] read(FriendlyByteBuf buffer) {
+        int size = buffer.readableBytes();
+        if (size > com.commandapi.protocol.BridgeProtocol.MAX_BYTES) throw new IllegalArgumentException("Payload too large");
+        byte[] bytes = new byte[size]; buffer.readBytes(bytes); return bytes;
+    }
+    ${payloadMethods}
+}

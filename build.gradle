@@ -134,3 +134,35 @@ tasks.register('printVersions') {
         }
     }
 }
+
+// Server releases are separate from Fabric artifacts and their compatibility manifest.
+tasks.register('buildServerAdapter') {
+    group = 'build'
+    dependsOn ':server-adapter:build'
+}
+tasks.register('collectServerArtifact') {
+    group = 'build'
+    dependsOn ':server-adapter:build'
+    doLast {
+        def target = layout.buildDirectory.dir('server-distributions').get().asFile
+        def artifacts = manifestJson.serverTargets.collect { name, spec ->
+            def task = project(':server-adapter').tasks.named(name == 'modern' ? 'jar' : "${name}Jar").get()
+            [name: name, spec: spec, jar: task.archiveFile.get().asFile]
+        }
+        // Sync generated output so upgrading from the old single JAR cannot publish it by mistake.
+        project.sync { copySpec ->
+            copySpec.from(artifacts.collect { it.jar })
+            copySpec.into(target)
+        }
+        new File(target, 'server-manifest.json').text = JsonOutput.prettyPrint(JsonOutput.toJson([
+            modVersion: modVersionValue, folia: false,
+            artifacts: artifacts.collect { artifact ->
+                [target: artifact.name, file: artifact.jar.name, java: artifact.spec.java,
+                 apiVersion: artifact.spec.apiVersion, minMinecraft: artifact.spec.minMinecraft,
+                 maxMinecraft: artifact.spec.maxMinecraft, spigotApi: artifact.spec.spigotApi,
+                 compatibility: 'compile-and-test verified; runtime evidence recorded separately']
+            },
+            dependencyPolicy: 'Gson provided by Bukkit/Minecraft; shared core bundled'
+        ])) + '\n'
+    }
+}

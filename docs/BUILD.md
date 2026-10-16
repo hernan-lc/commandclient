@@ -105,3 +105,15 @@ came from the family's production task, that artifact names are unique and carry
 their Minecraft version, and that every configured target produced a file.
 
 Compilation is not runtime proof — see [RUNTIME_VERIFICATION.md](RUNTIME_VERIFICATION.md).
+
+## Server adapter
+
+`./gradlew :server-adapter:build` runs server tests and verifies plugin packaging.
+`./gradlew collectServerArtifact` writes the JAR and server-manifest.json into
+`build/server-distributions/`, separately from Fabric artifacts. The build produces legacy and modern variants from the same sources against
+Spigot 1.16.5 (Java 8 bytecode) and 1.21.1 (Java 21 bytecode), respectively.
+`test` runs the server suite against the modern API; `legacyTest` repeats it
+against the legacy API and Gson baseline. `build` requires both. Run
+`./gradlew :server-adapter:legacyJar` for only the legacy artifact, or
+`:server-adapter:jar` for modern. Both use Gson supplied by Minecraft/Bukkit.
+See [verified scope](IMPLEMENTATION_VERIFICATION.md).

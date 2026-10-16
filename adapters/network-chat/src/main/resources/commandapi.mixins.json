@@ -5,7 +5,9 @@
   "client": [
     "CommandApiSendCommandMixin",
     "CommandApiLoginMixin",
-    "CommandApiSuggestionsMixin"
+    "CommandApiSuggestionsMixin",
+    "CommandApiServerTickMixin",
+    "CommandApiClientTickMixin"
   ],
   "injectors": {
     "defaultRequire": 1

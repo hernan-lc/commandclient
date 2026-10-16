@@ -16,15 +16,31 @@ import java.util.concurrent.Executor;
  * takes over.</p>
  */
 public final class MinecraftBridgeImpl extends ClientThreadBridge {
+    private final com.commandapi.transport.TransportRegistry transports = new com.commandapi.transport.TransportRegistry(
+            new com.commandapi.transport.SingleplayerNativeTransport((text, token) -> NativeCommands.submit(text, elevatedSingleplayer(), token)),
+            ClientNetworking.PLUGIN, new com.commandapi.transport.VanillaChatTransport(this::sendChatOnClientThread));
 
     @Override
     public boolean isInWorld() {
         return onClientThread(() -> Minecraft.getInstance().player != null, false, error -> false);
     }
 
+    @Override protected void configureNative(com.commandapi.config.ApiConfig config) { NativeCommands.configure(config); }
+
+    @Override public com.google.gson.JsonObject capabilities() {
+        return onClientThread(() -> {
+            com.google.gson.JsonObject json = ClientNetworking.PLUGIN.capabilities();
+            json.addProperty("singleplayer_native", true);
+            json.addProperty("async_jobs", true);
+            json.addProperty("elevated_singleplayer", elevatedSingleplayer());
+            json.addProperty("active_transport", transports.selected(Minecraft.getInstance().isLocalServer()));
+            return json;
+        }, new com.google.gson.JsonObject(), error -> new com.google.gson.JsonObject());
+    }
+
     @Override
     public String executionMode() {
-        return onClientThread(() -> Minecraft.getInstance().isLocalServer() ? "singleplayer-native" : "client-chat",
+        return onClientThread(() -> transports.selected(Minecraft.getInstance().isLocalServer()),
                 "unavailable", error -> "unavailable");
     }
 
@@ -43,8 +59,11 @@ public final class MinecraftBridgeImpl extends ClientThreadBridge {
     }
 
     @Override
-    protected java.util.concurrent.CompletableFuture<ChatResult> nativeCommand(String text) {
-        return NativeCommands.submit(text);
+    protected java.util.concurrent.CompletableFuture<ChatResult> nativeCommand(String text, com.commandapi.minecraft.CancellationToken cancellation) {
+        ClientNetworking.tick();
+        Object session = sessionIdentity();
+        return transports.execute(Minecraft.getInstance().isLocalServer(), text, cancellation,
+                () -> ClientNetworking.isCurrentSession(session) && java.util.Objects.equals(session, sessionIdentity()));
     }
 
     @Override

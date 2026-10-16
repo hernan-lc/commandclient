@@ -1,0 +1,37 @@
+package com.commandapi.version;
+import com.commandapi.protocol.BridgeProtocol;
+import com.commandapi.transport.ServerPluginTransport;
+import net.minecraft.client.Minecraft;
+public final class ClientNetworking {
+    public static final ServerPluginTransport PLUGIN = new ServerPluginTransport();
+    private static Object connection;
+    public static boolean isCurrentSession(Object session) { return connection == session; }
+    public static void reset() { connection = null; PLUGIN.reset(); }
+    public static void tick() {
+        Minecraft client = Minecraft.getInstance();
+        Object current = client.player == null || client.isLocalServer() ? null : client.player.connection;
+        if (current != connection) {
+            connection = current;
+            if (current != null) {
+                try { send("minecraft:register", BridgeProtocol.CHANNEL.getBytes(java.nio.charset.StandardCharsets.UTF_8)); }
+                catch (RuntimeException error) { PLUGIN.reset(); return; }
+            }
+            PLUGIN.connect(current, message -> send(BridgeProtocol.CHANNEL, BridgeProtocol.encode(message)), System.nanoTime());
+        }
+        PLUGIN.tick(System.nanoTime());
+    }
+    public static void receive(Object listener, byte[] bytes) {
+        Minecraft client = Minecraft.getInstance();
+        client.execute(() -> {
+            if (client.player == null || client.player.connection != listener || connection != listener) return;
+            try { PLUGIN.receive(listener, BridgeProtocol.decode(bytes, System.currentTimeMillis())); }
+            catch (IllegalArgumentException error) { /* Do not log untrusted payloads. */ }
+        });
+    }
+    private static void send(String channel, byte[] bytes) {
+        if (bytes.length > BridgeProtocol.MAX_BYTES) throw new IllegalArgumentException("Payload too large");
+        Minecraft client = Minecraft.getInstance();
+        if (client.player == null || client.player.connection != connection) throw new IllegalStateException("Connection changed");
+        ${send}
+    }
+}

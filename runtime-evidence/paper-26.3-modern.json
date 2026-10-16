@@ -1,0 +1,56 @@
+{
+  "target": "modern",
+  "server_api": "26.3.build.180-stable",
+  "paper_build": 180,
+  "code_commit": "d166b2b9217754944ce55004eabb6e17287643da",
+  "artifact": "commandapi-server-modern-1.3.2.jar",
+  "artifact_sha256": "6a1486aba85a9bc1775a5e28435019406fc20932fb2adc23b5e8218c7209ed88",
+  "checks": [
+    "standalone plugin enabled",
+    "authenticated console HTTP status",
+    "unauthenticated command rejected",
+    "command policy denied forbidden root",
+    "native dispatch",
+    "ordered async completion",
+    "plugin disable removed discovery file",
+    "HTTP listener released after stop"
+  ],
+  "result": {
+    "result": {
+      "text": "/time set day",
+      "success": true,
+      "output": "Command dispatched; plugin outcome is not confirmed",
+      "execution_status": "dispatched",
+      "code": "DISPATCHED",
+      "result_callbacks": 0
+    },
+    "success": true
+  },
+  "job": {
+    "id": "182584d6-4297-4717-965c-eb5ee462ce37",
+    "state": "completed",
+    "total": 2,
+    "processed": 2,
+    "failed_commands": 0,
+    "results": [
+      {
+        "text": "/time set day",
+        "success": true,
+        "output": "Command dispatched; plugin outcome is not confirmed",
+        "execution_status": "dispatched",
+        "code": "DISPATCHED",
+        "result_callbacks": 0
+      },
+      {
+        "text": "/weather clear",
+        "success": true,
+        "output": "Command dispatched; plugin outcome is not confirmed",
+        "execution_status": "dispatched",
+        "code": "DISPATCHED",
+        "result_callbacks": 0
+      }
+    ]
+  },
+  "recorded_utc": "2026-10-16T12:29:05Z",
+  "runtime_java": 25
+}

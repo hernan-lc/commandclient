@@ -15,13 +15,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ConfigLoaderTest {
 
     @Test
-    void defaultsToLoopbackWithoutAuth() {
+    void defaultsToAuthenticatedLoopback() {
         ApiConfig config = ConfigLoader.load(null);
         assertEquals("127.0.0.1", config.getHost());
         assertEquals(0, config.getPort());
         assertTrue(config.isEphemeral());
-        assertEquals("", config.getToken());
-        assertFalse(config.isAuthEnabled());
+        assertTrue(config.getToken().length() >= 43);
+        assertTrue(config.isAuthEnabled());
         assertFalse(config.isExposedBeyondLoopback());
     }
 
@@ -44,7 +44,7 @@ class ConfigLoaderTest {
         ApiConfig config = ConfigLoader.parse("{\"port\":9001}");
         assertEquals(9001, config.getPort());
         assertEquals("127.0.0.1", config.getHost());
-        assertFalse(config.isAuthEnabled());
+        assertTrue(config.isAuthEnabled());
         assertTrue(config.isLoginSummary());
     }
 
@@ -71,7 +71,7 @@ class ConfigLoaderTest {
     @Test
     void malformedFileFallsBackToDefaults(@TempDir Path dir) throws IOException {
         Files.write(dir.resolve(ConfigLoader.CONFIG_FILE_NAME), "{not json".getBytes(StandardCharsets.UTF_8));
-        assertEquals(0, ConfigLoader.load(dir).getPort());
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> ConfigLoader.load(dir));
     }
 
     @Test

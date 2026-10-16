@@ -21,8 +21,15 @@ function addressFromFile() {
   }
 }
 
-const BASE_URL = process.env.COMMANDAPI_URL || addressFromFile();
-const TOKEN = process.env.COMMANDAPI_TOKEN || null; // needed only when authEnabled is true
+const FILE_URL = addressFromFile();
+const BASE_URL = process.env.COMMANDAPI_URL || FILE_URL;
+function tokenFromFile() {
+  const dir = process.env.COMMANDAPI_CONFIG || path.join(os.homedir(), '.minecraft', 'config');
+  try { return JSON.parse(fs.readFileSync(path.join(dir, 'commandapi.json'), 'utf8')).token; }
+  catch { return null; }
+}
+// A URL override never receives another profile's token unless it matches its address file.
+const TOKEN = process.env.COMMANDAPI_TOKEN || (BASE_URL === FILE_URL ? tokenFromFile() : null);
 
 function headers() {
   return {

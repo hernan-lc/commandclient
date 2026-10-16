@@ -1,15 +1,16 @@
 # Command API
 
 A **client-side** Fabric mod that exposes a small REST API on your own machine
-for sending chat messages and commands as your Minecraft player.
+for sending chat and commands with authenticated native singleplayer execution,
+optional Paper/Spigot integration, and bounded asynchronous jobs.
 
 One repository builds the mod for every supported Minecraft version, from 1.16.x
 through the current 26.x releases: shared HTTP, config and API code lives in
 `common/`, each Minecraft API generation gets one adapter under `adapters/`, and
 `versions/` holds a four-line module per target.
 
-> ⚠️ This API acts as **you**. Anyone who can reach its port can chat and run
-> commands with your account. It listens on `127.0.0.1` only, unless you change
+> ⚠️ This API acts as **you**. The bearer token grants command authority; in singleplayer it can also grant
+> elevated native execution. It listens on `127.0.0.1` only, unless you change
 > that. See [docs/SECURITY.md](docs/SECURITY.md).
 
 ## Quick links
@@ -28,8 +29,11 @@ through the current 26.x releases: shared HTTP, config and API code lives in
 
 - **Send chat and commands over HTTP** as the local player, one message or a batch.
 - **Status endpoint** reporting the API, the Minecraft version and the current player.
-- **Bearer-token authentication**, off by default for a loopback-only server.
-- **Loopback by default**; exposing the API to the network is opt-in and warned about.
+- **Bearer-token authentication** enabled by default with a generated secure token; mandatory for every mutation.
+- **Native singleplayer commands** without enabling cheats, with confirmed callback results.
+- **Automatic Paper/Spigot discovery** using a permission-gated player-only protocol.
+- **Bounded async jobs** with progress, partial results, cancellation and shared sync/async ordering.
+- **Loopback by default**; remote binding requires explicit privileged opt-in and authentication.
 - **Ephemeral port by default** (`port: 0`); the OS picks a free port so instances never collide.
 - **In-game config commands**: `/commandapi status`, `/commandapi port`, `/commandapi host`, `/commandapi auth`, `/commandapi token`, `/commandapi login`, `/commandapi reload`, `/commandapi restart`.
 - **Login summary**: joining a world prints the bound address, port mode, auth and token state in chat (toggle with `/commandapi login off`).
@@ -117,19 +121,20 @@ matters to you.
 # The address changes on every start by default. Adjust this path if your
 # launcher uses another Minecraft directory.
 URL=$(python3 -c 'import json,pathlib; print(json.loads((pathlib.Path.home()/".minecraft/config/commandapi-address.json").read_text())["url"])')
-curl "$URL/api/status"
+TOKEN=$(python3 -c 'import json,pathlib; print(json.loads((pathlib.Path.home()/".minecraft/config/commandapi.json").read_text())["token"])')
+curl "$URL/api/status" -H "Authorization: Bearer $TOKEN"
 curl -X POST "$URL/api/chat" -H 'Content-Type: application/json' \
-  -d '{"text":"hello world"}'
+  -H "Authorization: Bearer $TOKEN" -d '{"text":"hello world"}'
 curl -X POST "$URL/api/chat" -H 'Content-Type: application/json' \
-  -d '{"text":"/time set day"}'
+  -H "Authorization: Bearer $TOKEN" -d '{"text":"/time set day"}'
 curl -X POST "$URL/api/chat" -H 'Content-Type: application/json' \
-  -d '{"messages":["one","two"]}'
+  -H "Authorization: Bearer $TOKEN" -d '{"messages":["one","two"]}'
 ```
 
 Use `text` for one message (`result` in the response) or `messages` for an
 array of one to 32 messages (`results` in the response). Each result reports
-whether Minecraft accepted the submission attempt; it does not confirm a
-server executed a slash command. The runnable client supports both forms:
+submission or execution status. Native callbacks can confirm execution;
+vanilla and Bukkit dispatch results do not establish ultimate world effects. The runnable client supports both forms:
 
 It needs Node.js 18 or newer and reads the address file from
 `~/.minecraft/config` unless `COMMANDAPI_CONFIG` or `COMMANDAPI_URL` is set.
@@ -155,21 +160,23 @@ Runtime settings live in `<minecraft>/config/commandapi.json`:
 {
   "port": 0,
   "host": "127.0.0.1",
-  "token": "",
-  "authEnabled": false,
+  "authEnabled": true,
+  "allowRemotePrivileged": false,
+  "elevatedSingleplayer": true,
+  "allowedCommands": ["*"],
   "loginSummary": true
 }
 ```
 
+The token is generated and saved on first launch. Every mutation requires it.
 `"port": 0` means automatic: the OS picks a free port each start. An example is
 in [`config/commandapi.json`](config/commandapi.json). Binding to anything
-other than loopback lets other machines send chat and commands as you — enable
-authentication if you do. `"loginSummary": true` prints a short config summary
+other than loopback requires authentication and `allowRemotePrivileged: true`. `"loginSummary": true` prints a short config summary
 in chat every time you join a world.
 
 In singleplayer, API slash commands execute natively with an elevated command source.
 See [native execution and async jobs](docs/NATIVE_EXECUTION.md).
-On remote servers, the client API reports `Command submitted` after forwarding a slash command. Minecraft
+On vanilla remote servers, the client API reports `Command submitted` after forwarding a slash command. Minecraft
 may still reject it; the HTTP response does not confirm server execution.
 If a host or port change fails, the previous config and HTTP server are restored.
 
@@ -186,9 +193,9 @@ The client completes `/commandapi` subcommands and suggests common values for
 | `/commandapi help` | List the commands |
 | `/commandapi status` | Show the bound address, config and state |
 | `/commandapi port <0-65535>` | `0` = automatic; anything else binds that port |
-| `/commandapi host <address>` | Default `127.0.0.1`; warns when exposed without auth |
+| `/commandapi host <address>` | Default `127.0.0.1`; remote binding also requires privileged opt-in |
 | `/commandapi auth <on\|off>` | Needs a token first to turn on |
-| `/commandapi token <secret\|clear>` | Setting a token enables auth; clearing disables it |
+| `/commandapi token <secret\|clear>` | Setting a token enables auth; clearing blocks HTTP mutations |
 | `/commandapi login <on\|off>` | Show a config summary on world join (default on; no restart) |
 | `/commandapi reload` | Re-read `commandapi.json` (for hand edits) and restart |
 | `/commandapi restart` | Restart the server on the current config |
@@ -198,7 +205,9 @@ The client completes `/commandapi` subcommands and suggests common values for
 ```bash
 ./gradlew buildAllVersions          # every configured Minecraft version
 ./gradlew :versions:26.2:build      # a single version
-./gradlew :common:test              # shared unit tests
+./gradlew :common:test              # shared unit and HTTP tests
+./gradlew :server-adapter:build     # plugin, server tests and packaging checks
+./gradlew collectServerArtifact     # separate server release artifact
 ```
 
 Artifacts land in `build/distributions/` with a `manifest.json`. Requires JDK 21
@@ -224,8 +233,7 @@ server did not start — change `port` in `config/commandapi.json`.
 **`503` on every request.** You are not in a world. Messages can only be sent as
 a player; join a world or server first.
 
-**`401 Unauthorized`.** `authEnabled` is true and the `Authorization: Bearer
-<token>` header is missing or wrong.
+**`401 Unauthorized`.** The bearer header is missing or wrong. Every mutation requires it, and reads do by default.
 
 **`404`.** Only `/api/status`, `/api/chat` and `/api/execute` exist.
 
@@ -236,9 +244,21 @@ Without it the text goes to chat as an ordinary message.
 version matches the game exactly — `commandapi-…+mc1.21.11.jar` will not load on
 1.21.8.
 
-**Another machine cannot reach it.** That is the default. Set `host` and turn on
-authentication — read [docs/SECURITY.md](docs/SECURITY.md) first.
+**Another machine cannot reach it.** That is the default. Set `host`, keep authentication on, and explicitly enable `allowRemotePrivileged` — read [docs/SECURITY.md](docs/SECURITY.md) first.
 
 ## License
 
 [MIT](LICENSE)
+
+## Paper/Spigot and async setup
+
+Install one server JAR into `plugins/`: `commandapi-server-legacy` for
+1.16.5–1.20.6 or `commandapi-server-modern` for 1.21–26.3. Both share the same
+configuration; replace the old JAR when switching variants. The default plugin
+policy denies commands and its `commandapi.execute` permission defaults to false.
+Grant access explicitly and configure permitted roots. Client discovery then
+uses the existing client HTTP URL; no server token is transmitted to the client.
+Administrator HTTP and console mode need separate explicit configuration.
+
+See [setup, transport and job semantics](docs/NATIVE_EXECUTION.md),
+[security migration](docs/SECURITY.md) and [verification evidence](docs/IMPLEMENTATION_VERIFICATION.md).

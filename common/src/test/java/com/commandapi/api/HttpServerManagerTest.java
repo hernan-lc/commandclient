@@ -57,14 +57,16 @@ class HttpServerManagerTest {
 
     private FakeBridge bridge;
     private int port;
+    private boolean serverAuthEnabled;
 
     private void start(boolean authEnabled, String token) throws IOException {
+        serverAuthEnabled = authEnabled;
         try (ServerSocket probe = new ServerSocket(0)) {
             port = probe.getLocalPort();
         }
         bridge = new FakeBridge();
         server = new HttpServerManager(
-                new ApiConfig("127.0.0.1", port, token, authEnabled), bridge, "1.2.0", "test");
+                new ApiConfig("127.0.0.1", port, authEnabled ? token : "test-token", authEnabled), bridge, "1.2.0", "test");
         assertTrue(server.start(), "server should bind");
     }
 
@@ -89,10 +91,12 @@ class HttpServerManagerTest {
         HttpURLConnection connection = (HttpURLConnection)
                 new URL("http://127.0.0.1:" + port + path).openConnection();
         connection.setRequestMethod(method);
+        if (auth == null && !serverAuthEnabled && !method.equals("GET")) auth = "Bearer test-token";
         if (auth != null) {
             connection.setRequestProperty("Authorization", auth);
         }
         if (body != null) {
+            connection.setRequestProperty("Content-Type", "application/json");
             connection.setDoOutput(true);
             try (OutputStream os = connection.getOutputStream()) {
                 os.write(body.getBytes(StandardCharsets.UTF_8));

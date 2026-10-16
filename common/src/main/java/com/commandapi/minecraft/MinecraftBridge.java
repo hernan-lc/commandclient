@@ -29,6 +29,18 @@ public interface MinecraftBridge {
                 : ChatResult.failure("Session changed");
     }
 
+    default java.util.concurrent.CompletableFuture<ChatResult> submitChat(String text, Object session, CancellationToken cancellation) {
+        if (cancellation.isCancelled()) return java.util.concurrent.CompletableFuture.completedFuture(ChatResult.failure("Cancelled", "CANCELLED"));
+        return java.util.concurrent.CompletableFuture.completedFuture(sendChat(text, session));
+    }
+
+    default void configure(com.commandapi.config.ApiConfig config) { }
+
+    default com.google.gson.JsonObject capabilities() {
+        com.google.gson.JsonObject json = new com.google.gson.JsonObject();
+        json.addProperty("async_jobs", true); return json;
+    }
+
     default String executionMode() { return "client-chat"; }
 
     /** Stable identity for the current connection; jobs cannot cross sessions. */

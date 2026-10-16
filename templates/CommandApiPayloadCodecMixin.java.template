@@ -1,0 +1,24 @@
+package com.commandapi.version.mixin;
+import com.commandapi.version.BridgePayload;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
+@Mixin(net.minecraft.network.protocol.common.custom.CustomPacketPayload.class)
+public interface CommandApiPayloadCodecMixin {
+    @ModifyVariable(method = "codec(Lnet/minecraft/network/protocol/common/custom/CustomPacketPayload\$FallbackProvider;Ljava/util/List;)Lnet/minecraft/network/codec/StreamCodec;", at = @At("HEAD"), argsOnly = true)
+    private static java.util.List commandapiTypes(java.util.List types) {
+        java.util.ArrayList copy = new java.util.ArrayList(types);
+        for (String channel : new String[]{"commandapi:bridge", "minecraft:register"}) {
+            net.minecraft.resources.${identifier} id = ${factory};
+            boolean registered = false;
+            for (Object entry : copy) if (((net.minecraft.network.protocol.common.custom.CustomPacketPayload.TypeAndCodec) entry).type().id().equals(id)) registered = true;
+            if (!registered) copy.add(new net.minecraft.network.protocol.common.custom.CustomPacketPayload.TypeAndCodec(
+                    new net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type(id),
+                    new net.minecraft.network.codec.StreamCodec<net.minecraft.network.FriendlyByteBuf, BridgePayload>() {
+                        public BridgePayload decode(net.minecraft.network.FriendlyByteBuf buffer) { return new BridgePayload(id, BridgePayload.read(buffer)); }
+                        public void encode(net.minecraft.network.FriendlyByteBuf buffer, BridgePayload value) { buffer.writeBytes(value.bytes); }
+                    }));
+        }
+        return copy;
+    }
+}

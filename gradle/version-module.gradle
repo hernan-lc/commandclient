@@ -47,7 +47,7 @@ dependencies {
     add(modConfiguration, "net.fabricmc:fabric-loader:${spec.loader}")
 
     // Minecraft ships Gson; compile against it without bundling it.
-    compileOnly 'com.google.code.gson:gson:2.10.1'
+    compileOnly "com.google.code.gson:gson:${manifest.sharedLibraries.gson}"
 
     testImplementation platform('org.junit:junit-bom:5.10.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -126,52 +126,92 @@ tasks.register('productionJar') {
     dependsOn family.productionJarTask
 }
 
-// Generate the small native API seam: permissions and command entrypoints
-// changed across Minecraft generations. These calls remain statically mapped.
+// Native API capabilities are explicit compatibility metadata, never inferred from names.
 def nativeSources = layout.buildDirectory.dir('generated/sources/native')
 sourceSets.main.java.srcDir nativeSources
 tasks.register('generateNativeCommands') {
-    inputs.property('minecraft', spec.minecraft)
+    inputs.property('nativeCapabilities', spec.native)
+    inputs.file(rootProject.file('templates/NativeCommands.java.template'))
     outputs.dir nativeSources
     doLast {
-        def modernPermissions = project.name.startsWith('26.') || project.name == '1.21.11'
-        def permission = modernPermissions ? 'net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS' : '4'
-        def prefixed = !(project.name.startsWith('1.16.') || project.name == '1.18.2')
-        def execute = prefixed ? 'performPrefixedCommand(source, text)' : 'performCommand(source, text.substring(1))'
-        def target = new File(nativeSources.get().asFile, 'com/commandapi/version/NativeCommands.java')
-        target.parentFile.mkdirs()
-        target.text = """package com.commandapi.version;
-import com.commandapi.minecraft.ChatResult;
-import java.util.concurrent.CompletableFuture;
-import net.minecraft.client.Minecraft;
-public final class NativeCommands {
-    public static CompletableFuture<ChatResult> submit(String text) {
-        Minecraft client = Minecraft.getInstance();
-        if (!client.isLocalServer() || client.getSingleplayerServer() == null) return null;
-        CompletableFuture<ChatResult> result = new CompletableFuture<>();
-        if (client.player == null) {
-            result.complete(ChatResult.failure("Player unavailable"));
-            return result;
+        def capability = spec.native
+        if (!(capability.permissions in ['numeric', 'set']) || !(capability.callback in ['brigadier', 'result']) ||
+                !(capability.entrypoint in ['performCommand', 'performPrefixedCommand']))
+            throw new GradleException("Invalid native capabilities for ${project.name}")
+        def properties = [
+            permission: capability.permissions == 'set' ? 'net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS' : '4',
+            callback: capability.callback == 'brigadier' ? '(context, success, value) -> feedback.record(success, value)' : '(success, value) -> feedback.record(success, value)',
+            execute: capability.entrypoint == 'performCommand' ? 'performCommand(source, text.substring(1))' : 'performPrefixedCommand(source, text)'
+        ]
+        copy {
+            from rootProject.file('templates/NativeCommands.java.template')
+            into new File(nativeSources.get().asFile, 'com/commandapi/version')
+            rename { 'NativeCommands.java' }
+            expand properties
         }
-        net.minecraft.server.MinecraftServer server = client.getSingleplayerServer();
-        java.util.UUID playerId = client.player.getUUID();
-        server.execute(() -> {
-            if (result.isDone()) return;
-            try {
-                net.minecraft.server.level.ServerPlayer player = server.getPlayerList().getPlayer(playerId);
-                if (player == null || !server.isRunning()) {
-                    result.complete(ChatResult.failure("Singleplayer session ended"));
-                    return;
-                }
-                net.minecraft.commands.CommandSourceStack source = player.createCommandSourceStack().withPermission(${permission});
-                server.getCommands().${execute};
-                result.complete(ChatResult.ok("Native command processed; see Minecraft feedback for command outcome"));
-            } catch (Throwable error) { result.complete(ChatResult.failure("Native execution failed: " + error)); }
-        });
-        return result;
-    }
-}
-"""
     }
 }
 tasks.named('compileJava') { dependsOn 'generateNativeCommands' }
+
+def networkSources = layout.buildDirectory.dir('generated/sources/network')
+sourceSets.main.java.srcDir networkSources
+tasks.register('generateNetworking') {
+    inputs.property('networkCapabilities', spec.network)
+    inputs.files(rootProject.fileTree('templates') { include '*Payload*.template', 'ClientNetworking.java.template', 'CommandApiDisconnectMixin.java.template' })
+    outputs.dir networkSources
+    doLast {
+        def n = spec.network
+        if (!(n.payload in ['legacy', 'typed', 'codec']) || !(n.identifier in ['ResourceLocation', 'Identifier']))
+            throw new GradleException("Invalid networking capabilities for ${project.name}")
+        def idType = "net.minecraft.resources.${n.identifier}"
+        def factory = n.identifierFactory == 'constructor' ? "new ${idType}(channel)" : "${idType}.${n.identifierFactory == 'parse' ? 'parse(channel)' : 'fromNamespaceAndPath(channel.split(":", 2)[0], channel.split(":", 2)[1])'}"
+        def legacy = n.payload == 'legacy'
+        def packet = legacy ? 'net.minecraft.network.protocol.game.ClientboundCustomPayloadPacket' : 'net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket'
+        def properties = [disconnectMethod: n.disconnectMethod, identifier: n.identifier, factory: factory, payloadImport: legacy ? "" : "import com.commandapi.version.BridgePayload;",
+            send: legacy ? "client.player.connection.send(new net.minecraft.network.protocol.game.ServerboundCustomPayloadPacket(${factory}, new net.minecraft.network.FriendlyByteBuf(io.netty.buffer.Unpooled.wrappedBuffer(bytes))));" : 'client.player.connection.send(new net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket(new BridgePayload(channel, bytes)));',
+            listener: legacy ? 'net.minecraft.client.multiplayer.ClientPacketListener' : 'net.minecraft.client.multiplayer.ClientCommonPacketListenerImpl',
+            packet: packet, packetDescriptor: packet.replace('.', '/'),
+            receive: legacy ? '''if (!packet.getIdentifier().toString().equals("commandapi:bridge")) return;
+        net.minecraft.network.FriendlyByteBuf buffer = packet.getData();
+        try {
+            if (buffer.readableBytes() <= com.commandapi.protocol.BridgeProtocol.MAX_BYTES) {
+                byte[] bytes = new byte[buffer.readableBytes()]; buffer.readBytes(bytes); ClientNetworking.receive(this, bytes);
+            }
+        } finally { buffer.release(); }
+        ci.cancel();''' : '''if (!(packet.payload() instanceof BridgePayload)) return;
+        ClientNetworking.receive(this, ((BridgePayload)packet.payload()).bytes); ci.cancel();''',
+            payloadMethods: n.payload == 'typed' ? '''public void write(FriendlyByteBuf buffer) { buffer.writeBytes(bytes); }
+    public net.minecraft.resources.ResourceLocation id() { return identifier; }''' : '''public net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type<BridgePayload> type() {
+        return new net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type<>(identifier);
+    }'''
+        ]
+        def templates = ['ClientNetworking', 'CommandApiPayloadMixin', 'CommandApiDisconnectMixin']
+        if (!legacy) templates.add('BridgePayload')
+        if (n.payload == 'codec') templates.add('CommandApiPayloadCodecMixin')
+        if (n.payload == 'typed') templates.add('CommandApiTypedPayloadMixin')
+        templates.each { name ->
+            copy {
+                from rootProject.file("templates/${name}.java.template")
+                into new File(networkSources.get().asFile, name.contains('Mixin') ? 'com/commandapi/version/mixin' : 'com/commandapi/version')
+                rename { "${name}.java" }
+                expand properties
+            }
+        }
+    }
+}
+tasks.named('compileJava') { dependsOn 'generateNetworking' }
+
+tasks.named('processResources') {
+    inputs.property('networkCapabilities', spec.network)
+    dependsOn 'generateNetworking'
+    exclude 'commandapi.mixins.json'
+    doLast {
+        def base = new groovy.json.JsonSlurper().parse(rootProject.file("${manifest.adapterFamilies[spec.adapterFamily].sourceDir}/src/main/resources/commandapi.mixins.json"))
+        if (spec.network.payload == 'codec') base.compatibilityLevel = 'JAVA_17'
+        base.client.add('CommandApiPayloadMixin')
+        base.client.add('CommandApiDisconnectMixin')
+        if (spec.network.payload == 'codec') base.client.add('CommandApiPayloadCodecMixin')
+        if (spec.network.payload == 'typed') base.client.add('CommandApiTypedPayloadMixin')
+        new File(destinationDir, 'commandapi.mixins.json').text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(base)) + '\n'
+    }
+}

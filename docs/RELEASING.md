@@ -17,3 +17,18 @@ The tag must match `modVersion`; for example, version `1.3.2` uses tag `v1.3.2`.
 The release workflow checks the tag/version match before building. A failed
 build or artifact verification must stop publication. A release can report
 build compatibility while still listing runtime verification as pending.
+
+## Separate server release
+
+Run `./gradlew buildAllVersions collectServerArtifact verifyBuilds` before release.
+The release workflow also builds/tests/verifies the server plugin and publishes
+`build/server-distributions/*.jar` with its server manifest. Fabric and server
+JARs install in different directories. Runtime compatibility remains tied to
+explicit evidence, not CI compilation.
+
+Server releases contain both `commandapi-server-legacy-<version>.jar` and
+`commandapi-server-modern-<version>.jar`. The server manifest lists their
+separate Java/API baselines and target ranges. Collection synchronizes its
+output directory so the superseded single JAR cannot be accidentally released.
+The packaging verifier requires both variants and inspects every class's
+bytecode level, including bundled common classes. Users install exactly one.

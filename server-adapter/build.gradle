@@ -1,23 +1,94 @@
 plugins { id 'java' }
 version = rootProject.ext.modVersion
-base { archivesName = 'commandapi-server' }
+def targets = rootProject.ext.manifest.serverTargets
 repositories {
     mavenCentral()
     maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
 }
-dependencies {
-    compileOnly 'org.spigotmc:spigot-api:1.21.1-R0.1-SNAPSHOT'
-    implementation project(':common')
-}
 java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
-tasks.named('jar') {
-    dependsOn ':common:jar'
-    from { configurations.runtimeClasspath.findAll { it.name.endsWith('.jar') }.collect { zipTree(it) } }
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
+
+// Both variants compile the exact same server sources against their own minimum API.
+sourceSets {
+    legacy {
+        java.srcDirs = sourceSets.main.java.srcDirs
+        resources.srcDirs = sourceSets.main.resources.srcDirs
+        compileClasspath += project(':common').sourceSets.main.output
+        runtimeClasspath += project(':common').sourceSets.main.output
+    }
+    legacyTest {
+        java.srcDirs = sourceSets.test.java.srcDirs
+        compileClasspath += sourceSets.legacy.output + project(':common').sourceSets.main.output
+        runtimeClasspath += sourceSets.legacy.output + project(':common').sourceSets.main.output
+    }
 }
 
-tasks.named('processResources') {
-    inputs.property('version', project.version)
-    filesMatching('plugin.yml') { expand(version: project.version) }
+dependencies {
+    compileOnly "org.spigotmc:spigot-api:${targets.modern.spigotApi}"
+    implementation project(':common')
+    legacyCompileOnly "org.spigotmc:spigot-api:${targets.legacy.spigotApi}"
+    legacyCompileOnly "com.google.code.gson:gson:${rootProject.ext.manifest.sharedLibraries.gson}"
+    ['testImplementation', 'legacyTestImplementation'].each { configuration ->
+        add(configuration, platform('org.junit:junit-bom:5.10.2'))
+        add(configuration, 'org.junit.jupiter:junit-jupiter')
+        add(configuration, 'org.mockito:mockito-core:5.14.2')
+    }
+    testImplementation "org.spigotmc:spigot-api:${targets.modern.spigotApi}"
+    legacyTestImplementation "org.spigotmc:spigot-api:${targets.legacy.spigotApi}"
+    legacyTestImplementation "com.google.code.gson:gson:${rootProject.ext.manifest.sharedLibraries.gson}"
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    legacyTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
+
+tasks.named('compileJava', JavaCompile) { options.release = targets.modern.java as int }
+tasks.named('compileLegacyJava', JavaCompile) {
+    dependsOn ':common:classes'
+    options.release = targets.legacy.java as int
+}
+
+def resourcesFor = { String taskName, String target ->
+    tasks.named(taskName, ProcessResources) {
+        inputs.property('version', project.version)
+        inputs.property('apiVersion', targets[target].apiVersion)
+        filesMatching('plugin.yml') { expand(version: project.version, api_version: targets[target].apiVersion) }
+    }
+}
+resourcesFor('processResources', 'modern')
+resourcesFor('processLegacyResources', 'legacy')
+
+// Bundle only our classes. Bukkit/Minecraft supplies Gson; no API/test libraries are shipped.
+tasks.named('jar', Jar) {
+    dependsOn ':common:classes'
+    archiveBaseName = 'commandapi-server-modern'
+    from project(':common').sourceSets.main.output
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+}
+tasks.register('legacyJar', Jar) {
+    dependsOn 'legacyClasses', ':common:classes'
+    archiveBaseName = 'commandapi-server-legacy'
+    from sourceSets.legacy.output
+    from project(':common').sourceSets.main.output
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+}
+tasks.register('legacyTest', Test) {
+    dependsOn 'legacyJar'
+    testClassesDirs = sourceSets.legacyTest.output.classesDirs
+    classpath = sourceSets.legacyTest.runtimeClasspath
+    useJUnitPlatform()
+}
+tasks.named('test', Test) { dependsOn 'jar'; useJUnitPlatform() }
+
+tasks.register('verifyPlugin', Exec) {
+    dependsOn 'jar', 'legacyJar'
+    commandLine 'python3', rootProject.file('scripts/verify-plugin.py').absolutePath,
+            tasks.named('legacyJar').get().archiveFile.get().asFile.absolutePath,
+            tasks.named('jar').get().archiveFile.get().asFile.absolutePath
+}
+tasks.named('assemble') { dependsOn 'legacyJar' }
+tasks.named('check') { dependsOn 'legacyTest', 'verifyPlugin' }
+tasks.register('testPackaging', Exec) {
+    dependsOn 'jar', 'legacyJar'
+    commandLine 'python3', rootProject.file('scripts/test-verify-plugin.py').absolutePath,
+            tasks.named('legacyJar').get().archiveFile.get().asFile.absolutePath,
+            tasks.named('jar').get().archiveFile.get().asFile.absolutePath
+}
+tasks.named('check') { dependsOn 'testPackaging' }

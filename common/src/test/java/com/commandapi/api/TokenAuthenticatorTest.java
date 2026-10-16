@@ -35,7 +35,13 @@ class TokenAuthenticatorTest {
     }
 
     @Test
-    void allowsEverythingWhenAuthEnabledButNoTokenConfigured() {
-        assertTrue(withAuth("").isAuthorized(null));
+    void rejectsAuthEnabledWithEmptyToken() {
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> withAuth(""));
+    }
+    @Test void mutationsRequireTokenEvenWhenReadAuthenticationDisabled() {
+        TokenAuthenticator auth = new TokenAuthenticator(new ApiConfig("127.0.0.1", 0, "secret", false));
+        assertFalse(auth.isAuthorized(null, true));
+        assertFalse(auth.isAuthorized("Bearer wrong", true));
+        assertTrue(auth.isAuthorized("Bearer secret", true));
     }
 }

@@ -62,10 +62,19 @@ jobs:
       # A release must not be published if any configured target fails, so this
       # builds them all in one run rather than a matrix.
       - name: Build all ${{ steps.jdks.outputs.target_count }} versions
-        run: ./gradlew buildAllVersions -Porg.gradle.java.installations.fromEnv=${{ steps.jdks.outputs.from_env }}
+        run: ./gradlew buildAllVersions collectServerArtifact -Porg.gradle.java.installations.fromEnv=${{ steps.jdks.outputs.from_env }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Verify example client credential scope
+        run: node --test docs/example-client.test.js
 
       - name: Verify artifacts against versions.json
         run: python3 scripts/verify-builds.py
+
+      - name: Verify standalone server artifact
+        run: python3 scripts/verify-plugin.py build/server-distributions/commandapi-server-*.jar
 
       - name: Build release notes
         run: |
@@ -76,6 +85,8 @@ jobs:
             echo
             echo "One JAR per supported Minecraft version. Drop the matching file into your \`mods/\` folder."
             echo "Fabric Loader is required; Fabric API is not."
+            echo "Install ONE server JAR in plugins/: legacy for 1.16.5-1.20.6 (Java 8 bytecode), modern for 1.21-26.x (Java 21 bytecode). Use the Java required by your server. Folia is unsupported."
+            echo "Runtime evidence is listed separately; compilation does not verify in-game behavior."
             echo
             sed -n '/^| Minecraft | Tier /,/^$/p' docs/VERSIONS.md
             echo "Columns: Artifact = built here, CI = verified by GitHub Actions, Runtime = exercised in game."
@@ -92,7 +103,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
-          ASSETS=(build/distributions/*.jar build/distributions/manifest.json)
+          ASSETS=(build/distributions/*.jar build/distributions/manifest.json build/server-distributions/*.jar build/server-distributions/server-manifest.json)
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "release $TAG already exists; updating it in place"

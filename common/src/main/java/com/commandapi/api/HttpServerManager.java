@@ -63,6 +63,7 @@ public final class HttpServerManager {
                              String modVersion, String minecraftVersion, Path configDir) {
         this.config = config;
         this.bridge = bridge;
+        bridge.configure(config);
         this.authenticator = new TokenAuthenticator(config);
         this.modVersion = modVersion;
         this.minecraftVersion = minecraftVersion;
@@ -72,8 +73,14 @@ public final class HttpServerManager {
     /** Binds and starts the server. Returns false if the port could not be bound. */
     public boolean start() {
         try {
+            if (config.isExposedBeyondLoopback() && (!config.isAllowRemotePrivileged() || !config.isAuthEnabled())) {
+                System.err.println("[CommandAPI] Remote binding requires authentication and allowRemotePrivileged=true");
+                return false;
+            }
             server = HttpServer.create(new InetSocketAddress(config.getHost(), config.getPort()), 0);
-            executor = Executors.newCachedThreadPool(daemonThreadFactory());
+            executor = new java.util.concurrent.ThreadPoolExecutor(config.getHttpWorkers(), config.getHttpWorkers(), 0, java.util.concurrent.TimeUnit.SECONDS,
+                    new java.util.concurrent.ArrayBlockingQueue<>(config.getMaxHttpQueue()), daemonThreadFactory(),
+                    new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
             server.setExecutor(executor);
 
             server.createContext("/api/chat", new ChatHandler());
@@ -82,7 +89,7 @@ public final class HttpServerManager {
             // Catch-all so unknown paths get a JSON 404 instead of an empty body.
             server.createContext("/", new NotFoundHandler());
 
-            jobs = new JobManager(bridge);
+            jobs = new JobManager(bridge, config);
             server.createContext("/api/jobs", new JobsHandler());
             server.start();
             registerShutdownHook();
@@ -142,10 +149,7 @@ public final class HttpServerManager {
      */
     private void registerShutdownHook() {
         shutdownHook = new Thread(() -> {
-            HttpServer running = server;
-            if (running != null) {
-                running.stop(0);
-            }
+            stop();
             com.commandapi.config.ConfigLoader.deleteAddress(configDir);
         }, "commandapi-shutdown");
         Runtime.getRuntime().addShutdownHook(shutdownHook);
@@ -191,7 +195,10 @@ public final class HttpServerManager {
                             + ApiLimits.MAX_BODY_BYTES + " bytes");
                 }
             }
-            return new String(baos.toByteArray(), StandardCharsets.UTF_8);
+            try {
+                return StandardCharsets.UTF_8.newDecoder().onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                        .decode(java.nio.ByteBuffer.wrap(baos.toByteArray())).toString();
+            } catch (java.nio.charset.CharacterCodingException error) { throw new ApiRequestException("Request body is not valid UTF-8"); }
         }
     }
 
@@ -209,7 +216,8 @@ public final class HttpServerManager {
     }
 
     private boolean authorize(HttpExchange exchange) throws IOException {
-        if (authenticator.isAuthorized(exchange.getRequestHeaders().getFirst("Authorization"))) {
+        if (authenticator.isAuthorized(exchange.getRequestHeaders().getFirst("Authorization"),
+                !exchange.getRequestMethod().equals("GET"))) {
             return true;
         }
         sendError(exchange, 401, "Unauthorized");
@@ -224,6 +232,21 @@ public final class HttpServerManager {
         @Override
         public final void handle(HttpExchange exchange) throws IOException {
             try {
+                String path = exchange.getRequestURI().getRawPath();
+                if (exchange.getRequestHeaders().containsKey("Origin")
+                        || "cross-site".equals(exchange.getRequestHeaders().getFirst("Sec-Fetch-Site"))) {
+                    sendError(exchange, 403, "Browser-origin requests are not supported"); return;
+                }
+                if (!(path.equals("/api/chat") || path.equals("/api/execute") || path.equals("/api/status")
+                        || path.equals("/api/jobs") || path.matches("/api/jobs/[a-f0-9-]{36}"))) {
+                    sendError(exchange, 404, "Unknown endpoint"); return;
+                }
+                if (exchange.getRequestMethod().equals("POST")) {
+                    String type = exchange.getRequestHeaders().getFirst("Content-Type");
+                    if (type == null || !type.split(";", 2)[0].trim().equalsIgnoreCase("application/json")) {
+                        sendError(exchange, 415, "Content-Type must be application/json"); return;
+                    }
+                }
                 handleSafely(exchange);
             } catch (RequestTooLargeException e) {
                 sendError(exchange, 413, e.getMessage());
@@ -247,6 +270,15 @@ public final class HttpServerManager {
         abstract void handleSafely(HttpExchange exchange) throws IOException;
     }
 
+    private boolean authorizeCommands(HttpExchange exchange, ApiRequest request) throws IOException {
+        for (String text : request.getMessages()) {
+            if (!config.getCommandPolicy().allows(text)) {
+                sendError(exchange, 403, "Command denied by configured policy"); return false;
+            }
+        }
+        return true;
+    }
+
     private final class ChatHandler extends SafeHandler {
         @Override
         void handleSafely(HttpExchange exchange) throws IOException {
@@ -260,6 +292,7 @@ public final class HttpServerManager {
             }
 
             ApiRequest request = ApiRequest.parse(readBody(exchange));
+            if (!authorizeCommands(exchange, request)) return;
 
             // Checked before sending so an offline client gets 503 rather than
             // a 200 whose body says every message failed.
@@ -269,11 +302,17 @@ public final class HttpServerManager {
                 return;
             }
 
-            List<JsonObject> results = new ArrayList<>();
-            for (String message : request.getMessages()) {
-                ChatResult result = bridge.sendChat(message);
-                results.add(ApiResponse.chatResult(message, result));
-            }
+            CommandScheduler.Work work = jobs.execute(request);
+            if (work == null) { sendError(exchange, 429, "Execution queue full"); return; }
+            try { work.await(config.getExecutionTimeoutSeconds()); }
+            catch (java.util.concurrent.TimeoutException error) { work.cancel("HTTP_WAIT_TIMEOUT"); }
+            catch (InterruptedException error) { work.cancel("HTTP_WAIT_CANCELLED"); Thread.currentThread().interrupt(); }
+            catch (java.util.concurrent.ExecutionException error) { work.cancel("EXECUTION_FAILED"); }
+            List<JsonObject> results = work.results();
+            for (int i = results.size(); i < request.getMessages().size(); i++)
+                results.add(ApiResponse.chatResult(request.getMessages().get(i),
+                        ChatResult.unknown("Completion unavailable; inspect job and do not retry automatically", "OUTCOME_UNKNOWN")));
+            exchange.getResponseHeaders().set("Location", "/api/jobs/" + work.id());
             sendJson(exchange, 200, ApiResponse.chat(results, request.isBatch()));
         }
     }
@@ -285,6 +324,7 @@ public final class HttpServerManager {
             String method = exchange.getRequestMethod();
             if (path.equals("/api/jobs") && method.equals("POST")) {
                 ApiRequest request = ApiRequest.parse(readBody(exchange));
+            if (!authorizeCommands(exchange, request)) return;
                 if (!bridge.isInWorld()) { sendError(exchange, 503, "Session unavailable"); return; }
                 JsonObject job = jobs.submit(request);
                 if (job == null) { sendError(exchange, 429, "Job capacity reached"); return; }
@@ -317,6 +357,10 @@ public final class HttpServerManager {
             JsonObject status = ApiResponse.status(config, getHost(), getPort(),
                     inWorld, inWorld ? bridge.getPlayerName() : null, modVersion, minecraftVersion);
             status.addProperty("mode", bridge.executionMode());
+            status.addProperty("execution_mode", bridge.executionMode());
+            status.add("capabilities", bridge.capabilities());
+            status.addProperty("mutation_auth_required", true);
+            for (java.util.Map.Entry<String, com.google.gson.JsonElement> entry : jobs.status().entrySet()) status.add(entry.getKey(), entry.getValue());
             sendJson(exchange, 200, status);
         }
     }

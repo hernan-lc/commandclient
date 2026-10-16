@@ -47,11 +47,13 @@ public final class ConfigLoader {
                 try (Reader reader = Files.newBufferedReader(configPath, StandardCharsets.UTF_8)) {
                     json = GSON.fromJson(reader, JsonObject.class);
                 } catch (IOException | RuntimeException e) {
-                    System.err.println("[CommandAPI] Failed to read " + configPath + ": " + e.getMessage());
+                    throw new IllegalArgumentException("Invalid API configuration", e);
                 }
             }
         }
-        return fromJson(json);
+        ApiConfig config = fromJson(json);
+        if (configDir != null && !save(configDir, config)) throw new IllegalStateException("Cannot securely persist API configuration");
+        return config;
     }
 
     /** file value > system property > default, per field. Never throws. */
@@ -59,19 +61,30 @@ public final class ConfigLoader {
         String host = string(json, "host", "api.host", ApiConfig.DEFAULT_HOST);
         int port = integer(json, "port", "api.port", ApiConfig.DEFAULT_PORT);
         String token = string(json, "token", "api.token", "");
-        boolean authEnabled = bool(json, "authEnabled", "api.auth.enabled", false);
+        boolean authEnabled = bool(json, "authEnabled", "api.auth.enabled", true);
+        if (token.isEmpty()) {
+            if (has(json, "token") && has(json, "authEnabled") && json.get("authEnabled").getAsBoolean())
+                throw new IllegalArgumentException("Authentication enabled with empty token");
+            token = ApiConfig.newToken();
+            authEnabled = true;
+        }
         boolean loginSummary = bool(json, "loginSummary", "api.login.summary", true);
-        return new ApiConfig(host, port, token, authEnabled, loginSummary);
+        java.util.List<String> allowed = new java.util.ArrayList<>();
+        if (has(json, "allowedCommands")) {
+            for (com.google.gson.JsonElement value : json.getAsJsonArray("allowedCommands")) allowed.add(value.getAsString());
+        } else allowed.add("*");
+        return new ApiConfig(host, port, token, authEnabled, loginSummary,
+                bool(json, "allowRemotePrivileged", "api.remote.privileged", false),
+                bool(json, "elevatedSingleplayer", "api.singleplayer.elevated", true), allowed,
+                limit(json, "maxJobs", 128), limit(json, "maxQueuedCommands", 1024),
+                limit(json, "commandsPerTick", 16), limit(json, "retentionSeconds", 600),
+                limit(json, "httpWorkers", 8), limit(json, "maxHttpQueue", 64),
+                limit(json, "executionTimeoutSeconds", 30), limit(json, "jobConcurrency", 1));
     }
 
     /** Parses a config document from raw JSON text. Never throws. */
     public static ApiConfig parse(String jsonText) {
-        try {
-            return fromJson(GSON.fromJson(jsonText, JsonObject.class));
-        } catch (RuntimeException e) {
-            System.err.println("[CommandAPI] Failed to parse config, using defaults: " + e.getMessage());
-            return ApiConfig.defaults();
-        }
+        return fromJson(GSON.fromJson(jsonText, JsonObject.class));
     }
 
     /**
@@ -94,11 +107,23 @@ public final class ConfigLoader {
             json.addProperty("token", config.getToken());
             json.addProperty("authEnabled", config.isAuthEnabled());
             json.addProperty("loginSummary", config.isLoginSummary());
+            json.addProperty("allowRemotePrivileged", config.isAllowRemotePrivileged());
+            json.addProperty("elevatedSingleplayer", config.isElevatedSingleplayer());
+            json.add("allowedCommands", GSON.toJsonTree(config.getCommandPolicy().commands()));
+            json.addProperty("maxJobs", config.getMaxJobs());
+            json.addProperty("maxQueuedCommands", config.getMaxQueuedCommands());
+            json.addProperty("commandsPerTick", config.getCommandsPerTick());
+            json.addProperty("retentionSeconds", config.getRetentionSeconds());
+            json.addProperty("httpWorkers", config.getHttpWorkers());
+            json.addProperty("maxHttpQueue", config.getMaxHttpQueue());
+            json.addProperty("executionTimeoutSeconds", config.getExecutionTimeoutSeconds());
+            json.addProperty("jobConcurrency", config.getJobConcurrency());
             Path configPath = configDir.resolve(CONFIG_FILE_NAME);
             writeJson(configPath, json);
+            securePermissions(configPath);
             return true;
         } catch (IOException | RuntimeException e) {
-            System.err.println("[CommandAPI] Failed to write config: " + e.getMessage());
+            System.err.println("[CommandAPI] Failed to write config: " + e.getClass().getSimpleName());
             return false;
         }
     }
@@ -121,7 +146,7 @@ public final class ConfigLoader {
             writeJson(addressPath, json);
             return true;
         } catch (IOException | RuntimeException e) {
-            System.err.println("[CommandAPI] Failed to write " + ADDRESS_FILE_NAME + ": " + e.getMessage());
+            System.err.println("[CommandAPI] Failed to write " + ADDRESS_FILE_NAME + ": " + e.getClass().getSimpleName());
             return false;
         }
     }
@@ -129,6 +154,7 @@ public final class ConfigLoader {
     private static void writeJson(Path target, JsonObject json) throws IOException {
         Path temporary = Files.createTempFile(target.getParent(), target.getFileName().toString(), ".tmp");
         try {
+            securePermissions(temporary);
             try (Writer writer = Files.newBufferedWriter(temporary, StandardCharsets.UTF_8)) {
                 PRETTY_GSON.toJson(json, writer);
             }
@@ -151,8 +177,17 @@ public final class ConfigLoader {
         try {
             Files.deleteIfExists(configDir.resolve(ADDRESS_FILE_NAME));
         } catch (IOException | RuntimeException e) {
-            System.err.println("[CommandAPI] Failed to delete " + ADDRESS_FILE_NAME + ": " + e.getMessage());
+            System.err.println("[CommandAPI] Failed to delete " + ADDRESS_FILE_NAME + ": " + e.getClass().getSimpleName());
         }
+    }
+
+    private static void securePermissions(Path path) throws IOException {
+        if (Files.getFileStore(path).supportsFileAttributeView("posix"))
+            Files.setPosixFilePermissions(path, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+    }
+    private static int limit(JsonObject json, String key, int fallback) {
+        if (!has(json, key)) return fallback;
+        return json.get(key).getAsInt();
     }
 
     private static String string(JsonObject json, String key, String property, String fallback) {
@@ -162,7 +197,7 @@ public final class ConfigLoader {
             }
             return System.getProperty(property, fallback);
         } catch (RuntimeException e) {
-            System.err.println("[CommandAPI] Invalid value for \"" + key + "\", using default: " + e.getMessage());
+            System.err.println("[CommandAPI] Invalid value for \"" + key + "\", using default: " + e.getClass().getSimpleName());
             return fallback;
         }
     }
@@ -175,7 +210,7 @@ public final class ConfigLoader {
             return ApiConfig.normalizePort(
                     Integer.parseInt(System.getProperty(property, String.valueOf(fallback))));
         } catch (RuntimeException e) {
-            System.err.println("[CommandAPI] Invalid value for \"" + key + "\", using default: " + e.getMessage());
+            System.err.println("[CommandAPI] Invalid value for \"" + key + "\", using default: " + e.getClass().getSimpleName());
             return fallback;
         }
     }
@@ -187,7 +222,7 @@ public final class ConfigLoader {
             }
             return Boolean.parseBoolean(System.getProperty(property, String.valueOf(fallback)));
         } catch (RuntimeException e) {
-            System.err.println("[CommandAPI] Invalid value for \"" + key + "\", using default: " + e.getMessage());
+            System.err.println("[CommandAPI] Invalid value for \"" + key + "\", using default: " + e.getClass().getSimpleName());
             return fallback;
         }
     }

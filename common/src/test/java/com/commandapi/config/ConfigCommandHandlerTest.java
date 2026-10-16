@@ -94,7 +94,7 @@ class ConfigCommandHandlerTest {
     void statusReportsState() {
         String text = joined(handler.handle("status"));
         assertTrue(text.contains("Running"));
-        assertTrue(text.contains("auth=off"));
+        assertTrue(text.contains("auth=on"));
     }
 
     @Test
@@ -144,6 +144,7 @@ class ConfigCommandHandlerTest {
 
     @Test
     void exposedHostWithoutAuthWarns() {
+        actions.config = new ApiConfig("127.0.0.1", 0, "", false);
         String text = joined(handler.handle("host 0.0.0.0"));
         assertTrue(text.contains("WARNING"));
         assertTrue(text.contains("/commandapi token"));
@@ -158,6 +159,7 @@ class ConfigCommandHandlerTest {
 
     @Test
     void authOnWithoutTokenRefuses() {
+        actions.config = new ApiConfig("127.0.0.1", 0, "", false);
         String text = joined(handler.handle("auth on"));
         assertTrue(text.contains("token"));
         assertFalse(actions.config.isAuthEnabled());
