@@ -2,7 +2,7 @@
 
 # Supported Minecraft versions
 
-Command API `1.3.2`. Every row is a target configured in [`versions.json`](../versions.json) with a module under `versions/`.
+Command API `1.4.0`. Every row is a target configured in [`versions.json`](../versions.json) with a module under `versions/`.
 
 ## What the columns mean
 

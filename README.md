@@ -73,7 +73,7 @@ adapter families and per-column meanings.
 
 The prior CI column records a run on a historical commit in the
 `hernan-lc/commandclient` fork. It does not verify the current source or the
-1.3.2 release. See [docs/VERSIONS.md](docs/VERSIONS.md) for the recorded commit.
+1.4.0 release. See [docs/VERSIONS.md](docs/VERSIONS.md) for the recorded commit.
 
 ### Support policy
 
