@@ -1,117 +1,57 @@
 # Runtime verification
 
-Compiling proves the adapter matches the Minecraft API it was built against.
-It does **not** prove the mod loads, that the HTTP server starts, or that a
-message actually reaches the chat. Those need the game.
+Compilation, integration tests using fake bridges, and actual Minecraft runtime
+are separate evidence. Current scope and results are recorded in
+[implementation verification](IMPLEMENTATION_VERIFICATION.md). The 1.16.1 and 26.3 native smoke records and Paper 26.3 integration record
+come from actual running games. The remaining runtime matrix is not verified.
 
-This project therefore tracks two separate things, and never lets one imply the
-other:
+Full `runtimeVerified` flags remain false until all relevant checks below run
+for that exact version. Never infer runtime support from another version in
+the same adapter family or from compilation alone.
 
-| Level | Meaning | Recorded in |
-|---|---|---|
-| Build verified | The target compiles and produces a JAR | build manifest / CI |
-| Runtime verified | Minecraft was launched and the API exercised | `runtimeVerified` in `versions.json` |
+## Reproduce native checks
 
-`runtimeVerified` is `false` for every target until a human runs the checklist
-below and records the result. The generated tables show `—` for anything not
-verified, never a tick.
-
-## Why this is not fully automated
-
-Running the client needs a display and a world or server session for each
-Minecraft version. A local singleplayer world can exercise the API without an
-online account. The hosted build jobs do not provide a game session, so their
-green status does not establish that chat or command submission works in game.
-
-What *is* automated: every target compiles, its metadata is inspected inside
-the JAR, and the whole HTTP layer is covered by unit tests against a fake
-bridge (`common/src/test/.../HttpServerManagerTest`), including status codes,
-authentication, limits and the missing-player path.
-
-## Per-family checklist
-
-Run these representative versions to check each adapter and build-family
-boundary. Record `runtimeVerified: true` only for the exact Minecraft versions
-actually launched and exercised.
-
-Representative versions:
-
-| Adapter family | Verify with |
-|---|---|
-| `legacy-chat` | 1.16.5 |
-| `signed-chat` | 1.19.2 |
-| `network-chat` (legacy build) | 1.21.11 |
-| `network-chat` (modern build) | 26.3 |
-
-The last row matters: the same adapter source is compiled by two different
-build families, so both need a runtime check.
-
-### Steps
-
-The port is automatic by default. Read the bound URL and port from the address
-file (paths below use your launcher's `config/` dir):
+Launch a clean Fabric profile without Fabric API and join a cheats-disabled
+singleplayer world. Read its address/token locally. Then run:
 
 ```bash
-export API_URL=$(python3 -c "import json; print(json.load(open('config/commandapi-address.json'))['url'])")
-export PORT=$(python3 -c "import json; print(json.load(open('config/commandapi-address.json'))['port'])")
+python3 scripts/runtime-smoke.py /path/to/profile/config \
+  --level-file '/path/to/profile/saves/TestWorld/level.dat' \
+  --output /tmp/native-smoke.json
 ```
 
-1. **Install** the matching JAR plus Fabric Loader into a clean profile. Do not
-   install Fabric API — the mod must work without it.
-2. **Start Minecraft.** The log shows `[CommandAPI] Listening on http://127.0.0.1:<port>`
-   and `config/commandapi-address.json` contains the same address. Failure here
-   usually means the entrypoint or `fabric.mod.json` is wrong.
-3. **Before joining a world**, check the offline path:
-   ```bash
-   curl -s "$API_URL/api/status"                         # in_world: false
-   curl -s -o /dev/null -w '%{http_code}\n' \
-        -X POST "$API_URL/api/chat" -d '{"text":"hi"}'  # 503
-   ```
-4. **Join a world or server**, then:
-   ```bash
-   curl -s "$API_URL/api/status"                         # in_world: true, player_name set
-   ```
-5. **Send a chat message** and confirm it appears in the chat as your player:
-   ```bash
-   curl -s -X POST "$API_URL/api/chat" -d '{"text":"runtime check"}'
-   ```
-6. **Send a command** that this player may use, and verify its effect in game.
-   The HTTP `Command submitted` result alone is insufficient. For a local world
-   with cheats enabled, one option is:
-   ```bash
-   curl -s -X POST "$API_URL/api/chat" -d '{"text":"/time set day"}'
-   ```
-7. **Send a batch** and confirm ordering:
-   ```bash
-   curl -s -X POST "$API_URL/api/chat" -d '{"messages":["one","two"]}'
-   ```
-8. **In-game commands**: type `/commanda` and confirm Tab suggests
-   `/commandapi`; type `/commandapi ` and confirm its subcommands appear.
-   Then type `/commandapi status` and `/commandapi restart`
-   (answered locally, nothing reaches the server). Then change to a known free
-   port and confirm the address file and `GET /api/status` match. Try a port
-   held by another process and confirm the old config, address file, and API
-   are restored. Finally use `/commandapi port 0` and confirm a fresh bound
-   address. Re-read `commandapi-address.json` and refresh `API_URL` and `PORT`
-   after every successful restart. This exercises the generation's mixin
-   and rollback path.
-9. **Disconnect** back to the main menu, repeat step 3 (must be 503 again, not a
-   crash), then **reconnect** and repeat step 5. This catches adapters that
-   cache a stale player or connection.
-10. **Close Minecraft** and confirm the latest bound port is free and the address file is gone:
-   ```bash
-   ss -ltn "( sport = :$PORT )"  # no LISTEN row should remain
-   ls config/commandapi-address.json || echo "address file removed"
-   ```
+The script rejects missing authentication, confirms native callback results,
+checks an invalid command, and waits for an ordered async batch. It does not
+print or store the token. It records the tested source commit and the world's
+cheats flag. Run it only against an isolated test world: it changes time/weather.
 
-### Recording the result
+Also check ordinary chat, typed in-game commands and completions, secure config
+migration, forbidden command roots, elevatedSingleplayer=false, cancellation,
+timeouts, disconnect/reconnect, restart rollback and resource cleanup. Confirm
+that the world's state and player context match each command's intended effects.
 
-Set `runtimeVerified` to `true` for the versions covered, add a note with the
-date and what was tested, then regenerate the tables:
+## Multiplayer checks
 
-```bash
-python3 scripts/generate-version-table.py
-```
+Use an isolated, authenticated Paper/Spigot server after its administrator has
+accepted Minecraft's EULA. Install only the server plugin first, then configure
+permitted roots and explicit commandapi.execute permission grants. Verify:
 
-Only set it for versions you actually ran. If an adapter family is verified on
-one version, say so in the note rather than silently ticking the others.
+- compatible HELLO/CAPABILITIES negotiation and automatic active transport;
+- unauthorized player denial and unchanged native player permissions;
+- cancellation by a separate command-policy plugin, including rewritten commands;
+- malformed, duplicate, expired and incompatible frames;
+- pending cancellation, disconnect, reconnect and no duplicate execution;
+- absent plugin and denied negotiation falling back to normal vanilla packets;
+- independent administrator HTTP setup, explicit console mode and token secrecy;
+- enable/disable/restart and actual plugin dependency loading.
+
+Keep the console token out of client profiles and packet capture artifacts.
+Never set a runtime flag for this based on mocks, packet serialization unit
+tests or plugin JAR inspection.
+
+## Matrix
+
+Build every entry in versions.json. Runtime representatives include 1.16.1,
+1.16.5, 1.18.2, 1.19.2, 1.19.4, 1.20.1, 1.20.6, 1.21.1, 1.21.11, 26.1 and 26.3,
+plus the 1.20.4 typed-payload boundary. Record exact versions, source/artifact
+hashes, authentication mode, command results and log excerpts without secrets.

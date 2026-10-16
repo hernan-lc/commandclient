@@ -105,3 +105,11 @@ came from the family's production task, that artifact names are unique and carry
 their Minecraft version, and that every configured target produced a file.
 
 Compilation is not runtime proof — see [RUNTIME_VERIFICATION.md](RUNTIME_VERIFICATION.md).
+
+## Server adapter
+
+`./gradlew :server-adapter:build` runs server tests and verifies plugin packaging.
+`./gradlew collectServerArtifact` writes the JAR and server-manifest.json into
+`build/server-distributions/`, separately from Fabric artifacts. The plugin
+requires Java 21+, Bukkit API 1.21, and Gson supplied by Minecraft/Bukkit.
+See [verified scope](IMPLEMENTATION_VERIFICATION.md).

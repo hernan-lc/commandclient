@@ -85,3 +85,11 @@ python3 scripts/generate-version-table.py --check
 
 Those four commands exercise the aggregate logic locally. A green local run
 does not mark a target as verified by CI.
+
+## Server adapter validation
+
+The Build workflow has a separate server job for unit/HTTP/Bukkit lifecycle
+tests, packaging verification and standalone artifact upload. Aggregation
+requires shared tests, server tests and all Fabric matrix builds to succeed.
+Hosted CI does not certify runtime compatibility; see
+[implementation evidence](IMPLEMENTATION_VERIFICATION.md).

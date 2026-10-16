@@ -1,84 +1,83 @@
 # Security
 
-This mod can send chat messages and run commands **as you**. Anyone who can
-reach its port can talk and issue commands with your account in whatever world
-or server you are on. Treat the port like a remote control for your player.
+HTTP commands can control the local player and, in singleplayer, create a
+command source with elevated permissions. Treat the API token as authority
+over that world. Ordinary commands typed in Minecraft chat are unaffected.
 
-## Defaults
+## Authentication and migration
 
-| Setting | Default | Why |
-|---|---|---|
-| `host` | `127.0.0.1` | Only this machine can connect. |
-| `port` | `0` (automatic) | The OS picks a free port per start; nothing assumes a fixed one. |
-| `authEnabled` | `false` | Safe *only* because the default bind is loopback. |
-| `token` | empty | — |
+Fresh configurations bind to `127.0.0.1`, use an ephemeral port, enable
+authentication, and generate a 256-bit SecureRandom bearer token. The token is
+saved in `config/commandapi.json`; it never appears in status, address discovery,
+protocol capabilities or audit logs. POSIX configuration files are owner-only
+(`0600`), including temporary files used for atomic writes.
 
-## In-game commands
+An old configuration with no token is migrated to a generated token and
+`authEnabled: true`. A missing token field is generated on first launch.
+Explicit `authEnabled: true` with `token: ""` is rejected. Invalid configuration
+files stop startup rather than replacing restrictive policies with defaults.
+Read the generated token locally; update your caller to send
+`Authorization: Bearer <token>`. The bundled Node client can read both address
+and token from the chosen profile directory.
 
-`/commandapi ...` runs with your privileges by construction: it is typed at
-your keyboard, answered inside your client, and never sent as a Minecraft
-server command. No token is needed (or accepted) there. The same caution as
-hand-editing the file applies — `/commandapi host 0.0.0.0` exposes you, and the command tells you so
-unless auth is on.
+`authEnabled: false` only permits unauthenticated reads. **Every POST and DELETE
+still requires a valid configured token**, including chat and native execution.
+Clearing a token blocks these operations until a new token is configured.
 
-The API is never exposed to the network unless you change `host` yourself.
+## HTTP boundary
 
-## If you expose it
+Requests carrying an `Origin` header or `Sec-Fetch-Site: cross-site` are rejected,
+including requests from localhost browser applications. There is no CORS
+allowlist or unauthenticated browser integration. Mutation clients must send
+`Content-Type: application/json`; decoding requires valid UTF-8. Only exact
+known paths and methods are supported. Bodies are bounded at 64 KiB, batches at
+32 messages, and text at 256 UTF-16 code units. Worker and command queues are
+bounded; command capacity exhaustion returns 429.
 
-Binding to `0.0.0.0` or a LAN address (for a container, another machine, or a
-stream setup) means anyone who can route to that port controls your player.
-Turn authentication on at the same time:
+Binding beyond loopback requires **both** authentication and an explicit
+`allowRemotePrivileged: true`. Changing `host` alone is rejected. HTTP is plain
+HTTP: use a trusted encrypted tunnel or TLS reverse proxy when transmitting
+credentials beyond the local machine.
 
-```json
-{
-  "host": "0.0.0.0",
-  "token": "a-long-random-string",
-  "authEnabled": true
-}
-```
+## Command policies
 
-The mod prints a prominent warning on startup if it is bound past loopback with
-authentication disabled. It does not refuse to start — that is your call — but
-it will not do it quietly.
+`allowedCommands` selects exact command roots, including namespace prefixes.
+`[]` denies slash commands; `["time", "weather"]` permits those roots;
+`["*"]` explicitly permits every root. Namespaces are distinct: allowing `time`
+does not allow `minecraft:time`. Allowing delegation roots such as `execute`,
+`function` or plugin aliases delegates the authority reachable through them;
+this is a root allowlist, not a parser for arbitrary nested command languages.
+Chat remains on the normal connection path.
 
-Generate a token with something like `openssl rand -hex 32`. Never reuse a
-password.
+`elevatedSingleplayer: true` applies elevation to the local command source only.
+Setting it to false preserves the player's normal native permissions. It never
+changes operator status or world settings. A remote server is never elevated
+by the client. Timed-out or unknown executions must not be automatically retried.
 
-## Audit notes
+## Server plugin
 
-What was reviewed and what the code does:
+The independent administrator HTTP API is off by default. Enabling player HTTP
+mode requires a selected player UUID. Console HTTP mode additionally requires
+`sender: console` and `console-enabled: true`. Its separate bearer token remains
+in the administrator's plugin configuration and is never sent to clients.
 
-| Area | Behaviour |
-|---|---|
-| Network binding | Bound explicitly to `config.host`; loopback default. Never binds `0.0.0.0` implicitly. |
-| Bearer parsing | Requires the exact `Bearer ` prefix; a malformed or absent header is a 401, never a bypass. |
-| Token comparison | Length check, then a comparison that does not exit early for equal-length tokens. |
-| Auth bypass | Skipped when `authEnabled` is false **or** the token is empty. An empty token leaves the API open even if `authEnabled` is true. |
-| Token logging | Never logged. `ApiConfig.toString()` reports only whether a token is configured (there is a test for this). |
-| Request size | Capped at 64 KiB while reading; a larger body is a 413, and the read stops rather than buffering it all. |
-| Batch size | At most 32 messages per request. |
-| Message length | At most 256 Java UTF-16 code units per message. |
-| Malformed JSON | Caught and answered with 400; parse failures never reach the game. |
-| HTTP methods | `/api/chat` and `/api/execute` are POST only; `/api/status` is GET only. Wrong-method responses carry an `Allow` header. |
-| Unknown paths | JSON 404 from a catch-all handler instead of an empty response. |
-| Uncaught exceptions | Handlers convert unexpected failures to JSON `500` when the client connection is still open. |
-| Disconnected clients | A broken pipe while writing is logged, not rethrown. |
-| Concurrency | Handlers are stateless; the only shared state is the config and the bridge. The config reference is swapped only while the server is stopped for a restart, and every service method is synchronized. |
-| Client thread | Minecraft status reads and sends are scheduled onto the client thread with a 5 s timeout (see below). |
-| Shutdown | `stop()` is idempotent and releases the port. A JVM shutdown hook stops the HTTP server and removes the address file if the client exits first. Worker threads are daemons. |
+Plugin-message execution always uses the player supplied by the established
+server connection. It requires `commandapi.execute` (default false), the command
+root policy (default empty), and any configured UUID allowlist. Payload fields
+cannot select another player or request console execution. Dispatcher calls
+run on the Bukkit main thread, with native permissions, after command events;
+cancellation by another plugin prevents dispatch. Event rewrites are checked
+against the root policy again. The bridge does not disable third-party spam,
+permission or cancellation policies.
 
-## Thread safety
-
-HTTP handlers run on worker threads. Minecraft state is accessed on the
-client thread, so `ClientThreadBridge` schedules status reads and sends onto
-`Minecraft.getInstance()` (which is itself an `Executor`) and waits up to five
-seconds for the result. On timeout the request answers with an error instead of
-blocking forever, and a rejected schedule (client shutting down) is reported
-rather than thrown.
-The bridge re-reads the player and connection for each send after reaching the
-client thread, so a reconnect does not reuse a cached connection.
+Messages have strict versioned decoding, size and time limits, correlated UUID
+request IDs, per-player ingress/command limits, a bounded replay cache covering
+the frame validity window, and cancellation on disconnect. Tokens are absent
+from the protocol. Audit logs contain only sender UUID and result code, never
+command text or credentials. Folia is unsupported.
 
 ## Reporting
 
-Found something? Open an issue at
-<https://github.com/nglmercer/commandclient/issues>. Do not include your token.
+Report issues at https://github.com/nglmercer/commandclient/issues without tokens
+or unredacted configuration files. See [runtime evidence](RUNTIME_VERIFICATION.md)
+for the limits of the verification performed.

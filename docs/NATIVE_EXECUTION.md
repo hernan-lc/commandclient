@@ -1,89 +1,129 @@
-# Native commands and asynchronous jobs
+# Native execution and async jobs
+
+## Automatic transport selection
+
+The Fabric client's HTTP URL stays the same when joining a world or server:
+
+1. Integrated singleplayer: local native command source, elevated by default.
+2. Multiplayer: authorized, compatible server plugin after negotiation.
+3. Multiplayer without an authorized compatible plugin: normal vanilla command
+   packets, with the server's existing permissions and limits.
+
+Only slash commands use native transports. Ordinary chat uses the original
+packet path. Negotiation waits at most two seconds and resets on disconnect.
+Fallback occurs before an EXECUTE message is sent. Once a command may have
+reached the server, unknown results never trigger a vanilla retry.
+
+Networking uses generated version-specific packet/codec mixins; Fabric API is
+not required. `versions.json` declares payload, identifier, disconnect,
+permission and callback capabilities explicitly. `/api/status` exposes active
+transport, protocol version, negotiation diagnostic and pending request count.
 
 ## Singleplayer
 
-Slash commands submitted through the API execute directly on the integrated
-server thread. The command source keeps the local player's location, entity
-and dimension, with elevated permissions (level 4 on older versions, all
-permissions on newer versions). Cheats need not be enabled. This elevation
-applies to the command source only; it does not permanently make the player
-an operator or change the world's settings. Commands do not travel through
-chat/command packets and there are no artificial intervals.
+Commands run on the integrated-server thread, including paused-world ticks.
+They retain player identity, position, dimension and context. Elevation applies
+to the command source only; cheats need not be enabled. Set
+`elevatedSingleplayer: false` to use normal player permissions. HTTP mutations
+always require bearer authentication. Typed in-game commands are not elevated.
 
-Ordinary chat still uses Minecraft's normal connection. Remote servers without
-the server plugin still receive normal command packets and enforce their own
-spam limits. Commands typed in the game's chat are not elevated by this feature.
-The existing loopback API can now execute privileged commands in a local world;
-its token therefore grants that authority when authentication is enabled.
+The native queue drains at most `commandsPerTick` entries and stops starting
+new entries after two milliseconds of dispatch time. There are no sleep delays.
+A single expensive command cannot be interrupted or bounded this way and can
+still stall a tick. Connection changes invalidate queued work before dispatch.
 
-## Async API
+## Structured results
 
-`POST /api/jobs` accepts the same `text`, `command`, or `messages` body as
-`/api/chat`. It returns **202** with `id`, `state`, `total`, `processed`, and
-`results`, and a `Location: /api/jobs/{id}` header.
+The legacy `text`, `success`, `output`, `result` and `results` fields remain.
+Each result also has `execution_status`, `code`, `result_callbacks`, and an
+optional `return_value`:
 
-```sh
-curl -X POST "$URL/api/jobs" -H 'Content-Type: application/json' \
-  -d '{"messages":["/time set day","/weather clear"]}'
-curl "$URL/api/jobs/JOB_ID"
-curl -X DELETE "$URL/api/jobs/JOB_ID"
-```
+| Status | Meaning |
+|---|---|
+| `accepted` | Validated and queued without waiting on a Minecraft thread |
+| `dispatched` | Passed to the command/packet dispatcher; outcome not confirmed |
+| `executed` | Success confirmed by Minecraft result callback |
+| `failed` | Rejected, exception, or confirmed command failure |
+| `unknown` | Completion cannot be established; do not automatically retry |
 
-All routes use the configured bearer authentication. Jobs execute in submission
-order on one worker, without sleeps or rate limits. States are `queued`,
-`running`, `completed`, `failed`, and `cancelled`. A failed command does not
-prevent the remaining commands in the batch from being attempted. Native
-Minecraft processing can report command errors through in-game feedback;
-`completed` alone does not establish that every requested world effect occurred.
+Numeric result zero can be successful. Missing callbacks are unknown, not
+successful execution. Legacy versions use Brigadier callbacks; newer versions
+use CommandResultCallback. A successful callback confirms execution, not every
+possible delayed world effect. Bukkit/plugin commands expose dispatch results,
+not a uniform callback for their ultimate effects.
 
-There are at most 128 retained jobs, each with the existing 32-message batch
-limit. The oldest finished job is evicted when space is needed; if all retained
-jobs are active, submission returns **429**. Unknown or evicted identifiers
-return **404**. Jobs are in memory and disappear on restart. Changing connection
-cancels outstanding commands before they can be sent to another session.
+## Jobs
 
-Native execution has a 30-second timeout; a timed-out command already running
-may still finish. Cancellation and shutdown prevent remaining commands. They cannot undo or stop
-a command that is already running. One expensive command can still stall the
-server tick. HTTP submission is asynchronous; world changes must execute on the
-Minecraft/Bukkit server thread.
+`POST /api/jobs` accepts the same body as `/api/chat` and returns 202 with a job
+ID and `Location: /api/jobs/{id}`. Inspect with GET; cancel with DELETE. Jobs
+have `queued`, `running`, `completed`, `failed` or `cancelled` state, `total`,
+`processed`, `failed_commands`, `last_error` and partial `results`.
 
-`/api/chat` and `/api/execute` retain their synchronous response format.
+Sync and async submissions share one scheduler. Default concurrency is one,
+which preserves global submission order. Increasing `jobConcurrency` allows
+jobs to overlap but preserves order within each job. Confirmed failures do not
+abort the rest of the batch; an unknown outcome stops remaining dispatch.
+Terminal states do not change. Cancellation cannot undo a running command;
+partial results may still arrive for that command after cancellation.
 
-## Paper / Spigot plugin
+`maxJobs` defaults to 128 and `maxQueuedCommands` to 1024. Completed jobs expire
+after `retentionSeconds` (600 by default) and can be evicted sooner for capacity.
+Full capacity returns 429. Unknown/expired job IDs return 404. Jobs are in-memory
+and are cancelled on restart/shutdown. Timeouts cancel queued remaining work
+without interrupting Minecraft's dispatcher. The default execution and HTTP
+wait timeout is 30 seconds; a synchronous timeout may have an unknown outcome.
+Its Location header allows inspecting the corresponding job.
 
-Build with `./gradlew :server-adapter:build`. Install
-`server-adapter/build/libs/commandapi-server-<version>.jar` into `plugins/`
-and restart the server. The plugin targets the Bukkit/Spigot 1.21 API; Folia
-is not supported. Runtime compatibility on individual server versions must be
-verified in game.
+## Installing Paper/Spigot
 
-The plugin starts its own HTTP API using the same routes, including `/api/jobs`.
-It is a direct server adapter: callers use the plugin's HTTP URL rather than
-the Fabric client's URL. No custom payload support or client-plugin handshake
-is required, and the Fabric client does not automatically forward to it.
+Build with `./gradlew :server-adapter:build`, or get the distinct server release
+artifact. Put `commandapi-server-<version>.jar` in `plugins/` and restart.
+The plugin targets Bukkit API 1.21 and Java 21+, packages the shared core, and
+uses Gson supplied by Minecraft/Bukkit. It does not package Bukkit, Fabric,
+Gson or test dependencies. Folia is unsupported. Compilation is separate from
+runtime compatibility evidence.
 
-Edit `plugins/CommandApiBridge/config.yml`:
+For connected-client integration, edit `plugins/CommandApiBridge/config.yml`:
 
 ```yaml
-host: 127.0.0.1
-port: 8081
-token: 'generated automatically on first launch'
-sender: player
-player-uuid: 'UUID of the player to control'
+allowed-commands: [time, weather, seed]
+allowed-players: []
+commands-per-tick: 8
 ```
 
-The selected player must be online. Execution keeps their permissions and
-location. Alternatively, explicitly set `sender: console` for server console
-authority; commands using player-relative selectors or coordinates should use
-`/execute as ... at ... run ...` as appropriate. The plugin never temporarily
-ops a player. Authentication is mandatory and the token is generated and saved
-on first launch. Set a fixed port when callers need a stable address; otherwise
-the chosen ephemeral port is printed in the server log and recorded in
-`plugins/CommandApiBridge/commandapi-address.json`.
+Grant `commandapi.execute` through your server's permission system to selected
+players. The grant only permits using the bridge; each command still runs with
+that player's native permissions. Default policy denies commands and the
+permission defaults to false. Restart the plugin/server to apply configuration.
 
-Only slash commands are accepted by the server adapter. They are dispatched
-with Bukkit on the main server thread, avoiding incoming chat command spam
-counters. Other plugins may still impose command restrictions, permissions,
-or their own limits. A successful dispatch is not proof of the command's
-ultimate effect. The API does not currently capture plugin command output.
+The optional administrator HTTP API needs explicit setup:
+
+```yaml
+http-enabled: true
+host: 127.0.0.1
+port: 8081
+sender: player
+player-uuid: 'canonical player UUID'
+allowed-commands: [time, weather]
+```
+
+A secure token is generated in the plugin config. For console authority, use
+`sender: console` **and** `console-enabled: true`. That authority is only for
+administrator HTTP calls; client payloads can never request it. A selected
+HTTP player must be online. Ephemeral addresses are recorded in
+`plugins/CommandApiBridge/commandapi-address.json` and removed on disable.
+
+## Protocol
+
+Channel `commandapi:bridge`, protocol version 1. Binary frames contain magic,
+version, kind, request UUID, wall-clock issue time and strict UTF-8 body.
+Kinds: HELLO, CAPABILITIES, EXECUTE, EXECUTE_RESULT, JOB_STATUS, CANCEL, ERROR.
+Frames are at most 8192 bytes, bodies 4096 bytes; execute text remains capped
+at 256 characters. Frames older than 30 seconds or over five seconds into the
+future are rejected. Peers therefore need reasonably synchronized clocks.
+
+The server limits each connected player to 16 messages/second and four new
+command requests/second, and retains completed request IDs for 60 seconds.
+Duplicate requests in this window return the previous outcome without dispatch.
+Active records are not evicted and per-session capacity is 512. Client requests
+are bounded at 128. No credential or console capability appears in this protocol.

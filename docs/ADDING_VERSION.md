@@ -19,7 +19,18 @@ Do not add several versions at once — port one, get it green, then move on.
   "adapterFamily": "network-chat",
   "tier": "B",
   "runtimeVerified": false,
-  "module": "versions:1.21.12"
+  "module": "versions:1.21.12",
+  "native": {
+    "permissions": "set",
+    "entrypoint": "performPrefixedCommand",
+    "callback": "result"
+  },
+  "network": {
+    "payload": "codec",
+    "identifier": "Identifier",
+    "identifierFactory": "parse",
+    "disconnectMethod": "disconnect(Lnet/minecraft/client/gui/screens/Screen;ZZ)V"
+  }
 }
 ```
 
@@ -157,3 +168,13 @@ CI picks the target up automatically: the matrix is generated from
 Building is not proof it works. Run the checklist in
 [RUNTIME_VERIFICATION.md](RUNTIME_VERIFICATION.md) for the exact new target
 before setting its `runtimeVerified` field to `true`.
+
+## Native and networking capabilities
+
+Verify native permission type, command entrypoint, callback signature, custom
+payload API, identifier factory and exact disconnect descriptor against the
+actual target classes. The sample above illustrates a shape, not verified API
+metadata for a hypothetical release. Generation rejects unknown capabilities;
+never infer them from the version's name. Build every target and exercise a real
+world/session before recording runtime support. Generated mixin resources must
+change whenever network capabilities change.

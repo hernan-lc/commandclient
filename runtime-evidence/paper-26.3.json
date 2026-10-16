@@ -1,0 +1,89 @@
+{
+  "minecraft": "26.3",
+  "paper_build": 180,
+  "client_mode": "server-plugin",
+  "client_capabilities": {
+    "protocol_version": 1,
+    "server_plugin": "ready",
+    "diagnostic": "READY",
+    "console": false,
+    "pending_requests": 0,
+    "singleplayer_native": true,
+    "async_jobs": true,
+    "elevated_singleplayer": true,
+    "active_transport": "server-plugin"
+  },
+  "admin_mode": "server-native-console",
+  "player_dispatch": {
+    "result": {
+      "text": "/time set day",
+      "success": true,
+      "output": "Server command dispatched; effect is not confirmed",
+      "execution_status": "dispatched",
+      "code": "DISPATCHED",
+      "result_callbacks": 0
+    },
+    "success": true
+  },
+  "third_party_cancel": {
+    "result": {
+      "text": "/weather rain",
+      "success": false,
+      "output": "Server rejected command",
+      "execution_status": "failed",
+      "code": "COMMAND_CANCELLED",
+      "result_callbacks": 0
+    },
+    "success": false
+  },
+  "disconnect_rejected": 503,
+  "capabilities_reset": {
+    "protocol_version": 1,
+    "server_plugin": "unavailable",
+    "diagnostic": "NOT_CONNECTED",
+    "console": false,
+    "pending_requests": 0,
+    "singleplayer_native": true,
+    "async_jobs": true,
+    "elevated_singleplayer": true,
+    "active_transport": "client-chat"
+  },
+  "vanilla_fallback": {
+    "result": {
+      "text": "/time set day",
+      "success": true,
+      "output": "Command submitted",
+      "execution_status": "dispatched",
+      "code": "DISPATCHED",
+      "result_callbacks": 0
+    },
+    "success": true
+  },
+  "fallback_capabilities": {
+    "protocol_version": 1,
+    "server_plugin": "unavailable",
+    "diagnostic": "NEGOTIATION_TIMEOUT",
+    "console": false,
+    "pending_requests": 0,
+    "singleplayer_native": true,
+    "async_jobs": true,
+    "elevated_singleplayer": true,
+    "active_transport": "client-chat"
+  },
+  "same_endpoint_across_connections": true,
+  "unprivileged_player": {
+    "result": {
+      "text": "/time set day",
+      "success": false,
+      "output": "Server rejected command",
+      "execution_status": "failed",
+      "code": "COMMAND_REJECTED",
+      "result_callbacks": 0
+    },
+    "success": false
+  },
+  "reenable_and_renegotiate": true,
+  "code_commit": "084ddf0b6669c416f94dcc37cc786c73ae57def7",
+  "plugin_sha256": "123074044f5cd91840d9466a23adfd895516391600ad41d99b14308ed52368fe",
+  "recorded_utc": "2026-10-13T14:11:58Z"
+}
