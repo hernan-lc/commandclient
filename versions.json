@@ -376,5 +376,21 @@
   },
   "sharedLibraries": {
     "gson": "2.8.0"
+  },
+  "serverTargets": {
+    "legacy": {
+      "spigotApi": "1.16.5-R0.1-SNAPSHOT",
+      "apiVersion": "1.16",
+      "java": 8,
+      "minMinecraft": "1.16.5",
+      "maxMinecraft": "1.20.6"
+    },
+    "modern": {
+      "spigotApi": "1.21.1-R0.1-SNAPSHOT",
+      "apiVersion": "1.21",
+      "java": 21,
+      "minMinecraft": "1.21",
+      "maxMinecraft": "26.3"
+    }
   }
 }

@@ -144,12 +144,24 @@ tasks.register('collectServerArtifact') {
     group = 'build'
     dependsOn ':server-adapter:build'
     doLast {
-        def jar = project(':server-adapter').tasks.named('jar').get().archiveFile.get().asFile
         def target = layout.buildDirectory.dir('server-distributions').get().asFile
-        target.mkdirs()
-        Files.copy(jar.toPath(), new File(target, jar.name).toPath(), StandardCopyOption.REPLACE_EXISTING)
+        def artifacts = manifestJson.serverTargets.collect { name, spec ->
+            def task = project(':server-adapter').tasks.named(name == 'modern' ? 'jar' : "${name}Jar").get()
+            [name: name, spec: spec, jar: task.archiveFile.get().asFile]
+        }
+        // Sync generated output so upgrading from the old single JAR cannot publish it by mistake.
+        project.sync { copySpec ->
+            copySpec.from(artifacts.collect { it.jar })
+            copySpec.into(target)
+        }
         new File(target, 'server-manifest.json').text = JsonOutput.prettyPrint(JsonOutput.toJson([
-            modVersion: modVersionValue, file: jar.name, java: 21, apiVersion: '1.21', folia: false,
+            modVersion: modVersionValue, folia: false,
+            artifacts: artifacts.collect { artifact ->
+                [target: artifact.name, file: artifact.jar.name, java: artifact.spec.java,
+                 apiVersion: artifact.spec.apiVersion, minMinecraft: artifact.spec.minMinecraft,
+                 maxMinecraft: artifact.spec.maxMinecraft, spigotApi: artifact.spec.spigotApi,
+                 compatibility: 'compile-and-test verified; runtime evidence recorded separately']
+            },
             dependencyPolicy: 'Gson provided by Bukkit/Minecraft; shared core bundled'
         ])) + '\n'
     }

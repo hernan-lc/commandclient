@@ -72,7 +72,7 @@ jobs:
           echo "common/ is free of Minecraft and Fabric imports"
 
   server:
-    name: Paper/Spigot adapter tests and packaging
+    name: Paper/Spigot legacy and modern tests and packaging
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -81,7 +81,7 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v6
-      - name: Build, test, and verify plugin
+      - name: Build, test against both APIs, and verify both JARs
         run: ./gradlew :server-adapter:build collectServerArtifact
       - uses: actions/upload-artifact@v7
         with:
@@ -92,7 +92,9 @@ jobs:
         if: always()
         with:
           name: commandapi-server-test-reports
-          path: server-adapter/build/test-results/test
+          path: |
+            server-adapter/build/test-results/test
+            server-adapter/build/test-results/legacyTest
 
   build:
     name: Minecraft ${{ matrix.target.minecraft }}

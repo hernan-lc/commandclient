@@ -85,7 +85,7 @@ jobs:
             echo
             echo "One JAR per supported Minecraft version. Drop the matching file into your \`mods/\` folder."
             echo "Fabric Loader is required; Fabric API is not."
-            echo "The separate commandapi-server JAR installs in Paper/Spigot plugins/. Java 21+, API 1.21; Folia is unsupported."
+            echo "Install ONE server JAR in plugins/: legacy for 1.16.5-1.20.6 (Java 8 bytecode), modern for 1.21-26.x (Java 21 bytecode). Use the Java required by your server. Folia is unsupported."
             echo "Runtime evidence is listed separately; compilation does not verify in-game behavior."
             echo
             sed -n '/^| Minecraft | Tier /,/^$/p' docs/VERSIONS.md
