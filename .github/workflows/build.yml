@@ -57,6 +57,12 @@ jobs:
       - name: Unit tests
         run: ./gradlew :common:test
 
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Example client credential-scoping integration test
+        run: node --test docs/example-client.test.js
+
       - name: Fail if shared code imports Minecraft or Fabric
         run: |
           if grep -rn "net\.minecraft\|net\.fabricmc" common/src/main/java; then
