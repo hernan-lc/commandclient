@@ -149,10 +149,7 @@ public final class HttpServerManager {
      */
     private void registerShutdownHook() {
         shutdownHook = new Thread(() -> {
-            HttpServer running = server;
-            if (running != null) {
-                running.stop(0);
-            }
+            stop();
             com.commandapi.config.ConfigLoader.deleteAddress(configDir);
         }, "commandapi-shutdown");
         Runtime.getRuntime().addShutdownHook(shutdownHook);
