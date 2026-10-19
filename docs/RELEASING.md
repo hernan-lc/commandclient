@@ -26,6 +26,10 @@ The workflow always checks out the tag it is releasing, so a manual run
 the tagged commit and not from whatever branch triggered it. It runs for a
 pushed `v*`/`V*` tag, for a release published in the web UI, and on demand.
 
+The published release is titled `Command API v<modVersion>` whatever the tag
+is called; the release notes name the tag the artifacts were built from when
+it differs from that canonical form.
+
 ## Separate server release
 
 Run `./gradlew buildAllVersions collectServerArtifact verifyBuilds` before release.
