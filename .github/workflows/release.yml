@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*'
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       tag:
@@ -47,7 +49,7 @@ jobs:
       # Checked before the ~3 minute build so a mistake surfaces in seconds.
       - name: Check the tag matches versions.json
         run: |
-          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          TAG="${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.tag || github.ref_name }}"
           EXPECTED="v${{ steps.jdks.outputs.mod_version }}"
           if [ "$TAG" != "$EXPECTED" ]; then
             echo "::error title=Tag/version mismatch::tag $TAG does not match modVersion \
@@ -78,7 +80,7 @@ jobs:
 
       - name: Build release notes
         run: |
-          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          TAG="${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.tag || github.ref_name }}"
           python3 scripts/generate-version-table.py
           {
             echo "## Command API $TAG"
@@ -102,7 +104,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          TAG="${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.tag || github.ref_name }}"
           ASSETS=(build/distributions/*.jar build/distributions/manifest.json build/server-distributions/*.jar build/server-distributions/server-manifest.json)
 
           if gh release view "$TAG" >/dev/null 2>&1; then
