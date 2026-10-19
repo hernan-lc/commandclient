@@ -22,6 +22,16 @@ have `Content-Type: application/json`. Browser-origin requests are rejected.
 | `/api/jobs` | POST | Queue work; return 202 and Location |
 | `/api/jobs/{id}` | GET | Inspect state and partial results |
 | `/api/jobs/{id}` | DELETE | Cancel remaining work |
+| `/api/functions` | GET | List functions |
+| `/api/functions/{id}` | GET | Inspect function |
+| `/api/functions/{id}/run` | POST | Execute function (`{"args":{...},"async":true}`) |
+| `/api/functions/{id}/preview` | POST | Preview resolved commands without executing |
+| `/api/functions/validate` | POST | Validate a submitted function |
+| `/api/functions/reload` | POST | Reload functions from disk |
+| `/api/functions` | POST | Create function (auth required) |
+| `/api/functions/{id}` | PUT/DELETE | Update/delete function (auth required) |
+
+Function details, preview/run shapes and management auth: [FUNCTION_API.md](FUNCTION_API.md).
 
 Paths are exact. Requests use `{"text":"/time set day"}`, the legacy
 `{"command":"/seed"}`, or `{"messages":["/time set day","/weather clear"]}`.

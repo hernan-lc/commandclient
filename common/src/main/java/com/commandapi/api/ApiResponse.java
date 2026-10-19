@@ -99,6 +99,12 @@ public final class ApiResponse {
         endpoints.addProperty("/api/execute", "POST - Alias for /api/chat");
         endpoints.addProperty("/api/jobs", "POST - Submit asynchronous job");
         endpoints.addProperty("/api/jobs/{id}", "GET/DELETE - Inspect or cancel job");
+        endpoints.addProperty("/api/functions", "GET - List functions");
+        endpoints.addProperty("/api/functions/{id}", "GET - Inspect function");
+        endpoints.addProperty("/api/functions/{id}/run", "POST - Execute function");
+        endpoints.addProperty("/api/functions/{id}/preview", "POST - Preview resolved commands");
+        endpoints.addProperty("/api/functions/validate", "POST - Validate submitted function");
+        endpoints.addProperty("/api/functions/reload", "POST - Reload functions");
         status.add("endpoints", endpoints);
         return status;
     }

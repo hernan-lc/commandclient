@@ -2,7 +2,7 @@
 
 # Supported Minecraft versions
 
-Command API `1.4.0`. Every row is a target configured in [`versions.json`](../versions.json) with a module under `versions/`.
+Command API `1.5.0`. Every row is a target configured in [`versions.json`](../versions.json) with a module under `versions/`.
 
 ## What the columns mean
 
@@ -14,28 +14,28 @@ Command API `1.4.0`. Every row is a target configured in [`versions.json`](../ve
 
 A local build says nothing about a past CI run, and neither says the mod was ever run in the game. Nothing in this file is hand-written.
 
-Build manifest: `1.3.2`, 15 artifact(s).
+Build manifest: `1.5.0`, 15 artifact(s).
 
 CI status: workflow **Build** run [33278509806](https://github.com/hernan-lc/commandclient/actions/runs/33278509806) on `main` (success), recorded from commit `5fdc9e8d`.
 The CI ticks below describe that historical commit only.
 
 | Minecraft | Tier | Java | Loader | Build family | Adapter | Artifact | Prior CI run | Runtime | File |
 | --------- | :--: | ---: | ------ | ------------ | ------- | :------: | :-: | :-----: | ---- |
-| 1.16.1 | D | 8 | 0.14.24 | legacy-remapped | legacy-chat | ✅ | ✅ | — | `commandapi-1.3.2+mc1.16.1.jar` |
-| 1.16.5 | C | 8 | 0.14.24 | legacy-remapped | legacy-chat | ✅ | ✅ | — | `commandapi-1.3.2+mc1.16.5.jar` |
-| 1.18.2 | C | 17 | 0.16.14 | legacy-remapped | legacy-chat | ✅ | ✅ | — | `commandapi-1.3.2+mc1.18.2.jar` |
-| 1.19.2 | C | 17 | 0.16.14 | legacy-remapped | signed-chat | ✅ | ✅ | — | `commandapi-1.3.2+mc1.19.2.jar` |
-| 1.19.4 | D | 17 | 0.16.14 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.3.2+mc1.19.4.jar` |
-| 1.20.1 | C | 17 | 0.16.14 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.3.2+mc1.20.1.jar` |
-| 1.20.4 | D | 17 | 0.16.14 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.3.2+mc1.20.4.jar` |
-| 1.20.6 | C | 21 | 0.16.14 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.3.2+mc1.20.6.jar` |
-| 1.21.1 | B | 21 | 0.16.14 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.3.2+mc1.21.1.jar` |
-| 1.21.4 | B | 21 | 0.16.14 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.3.2+mc1.21.4.jar` |
-| 1.21.8 | B | 21 | 0.19.3 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.3.2+mc1.21.8.jar` |
-| 1.21.11 | B | 21 | 0.19.3 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.3.2+mc1.21.11.jar` |
-| 26.1 | B | 25 | 0.19.5 | modern-unobfuscated | network-chat | ✅ | ✅ | — | `commandapi-1.3.2+mc26.1.jar` |
-| 26.2 | B | 25 | 0.19.5 | modern-unobfuscated | network-chat | ✅ | ✅ | — | `commandapi-1.3.2+mc26.2.jar` |
-| 26.3 | A | 25 | 0.19.5 | modern-unobfuscated | network-chat | ✅ | — | — | `commandapi-1.3.2+mc26.3.jar` |
+| 1.16.1 | D | 8 | 0.14.24 | legacy-remapped | legacy-chat | ✅ | ✅ | — | `commandapi-1.5.0+mc1.16.1.jar` |
+| 1.16.5 | C | 8 | 0.14.24 | legacy-remapped | legacy-chat | ✅ | ✅ | — | `commandapi-1.5.0+mc1.16.5.jar` |
+| 1.18.2 | C | 17 | 0.16.14 | legacy-remapped | legacy-chat | ✅ | ✅ | — | `commandapi-1.5.0+mc1.18.2.jar` |
+| 1.19.2 | C | 17 | 0.16.14 | legacy-remapped | signed-chat | ✅ | ✅ | — | `commandapi-1.5.0+mc1.19.2.jar` |
+| 1.19.4 | D | 17 | 0.16.14 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.5.0+mc1.19.4.jar` |
+| 1.20.1 | C | 17 | 0.16.14 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.5.0+mc1.20.1.jar` |
+| 1.20.4 | D | 17 | 0.16.14 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.5.0+mc1.20.4.jar` |
+| 1.20.6 | C | 21 | 0.16.14 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.5.0+mc1.20.6.jar` |
+| 1.21.1 | B | 21 | 0.16.14 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.5.0+mc1.21.1.jar` |
+| 1.21.4 | B | 21 | 0.16.14 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.5.0+mc1.21.4.jar` |
+| 1.21.8 | B | 21 | 0.19.3 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.5.0+mc1.21.8.jar` |
+| 1.21.11 | B | 21 | 0.19.3 | legacy-remapped | network-chat | ✅ | ✅ | — | `commandapi-1.5.0+mc1.21.11.jar` |
+| 26.1 | B | 25 | 0.19.5 | modern-unobfuscated | network-chat | ✅ | ✅ | — | `commandapi-1.5.0+mc26.1.jar` |
+| 26.2 | B | 25 | 0.19.5 | modern-unobfuscated | network-chat | ✅ | ✅ | — | `commandapi-1.5.0+mc26.2.jar` |
+| 26.3 | A | 25 | 0.19.5 | modern-unobfuscated | network-chat | ✅ | — | — | `commandapi-1.5.0+mc26.3.jar` |
 
 ## Support tiers
 

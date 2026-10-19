@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "name": "firework_event",
+  "description": "Celebrate with particles, sound and a title",
+  "parameters": {
+    "title": {
+      "type": "string",
+      "default": "Celebration!"
+    },
+    "particle": {
+      "type": "resource_location",
+      "default": "minecraft:firework"
+    },
+    "count": {
+      "type": "integer",
+      "min": 1,
+      "max": 500,
+      "default": 50
+    }
+  },
+  "steps": [
+    {
+      "type": "title",
+      "target": "@a",
+      "title": "${title}",
+      "subtitle": "",
+      "fadeInTicks": 5,
+      "stayTicks": 40,
+      "fadeOutTicks": 10
+    },
+    {
+      "type": "particle",
+      "particle": "${particle}",
+      "position": "~ ~2 ~",
+      "count": "${count}"
+    },
+    {
+      "type": "sound",
+      "sound": "minecraft:entity.firework_rocket.blast",
+      "source": "master",
+      "target": "@a",
+      "volume": 1,
+      "pitch": 1
+    },
+    {
+      "type": "command",
+      "value": "say ${title}"
+    }
+  ]
+}

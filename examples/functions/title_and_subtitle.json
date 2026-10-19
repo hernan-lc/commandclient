@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "name": "title_and_subtitle",
+  "description": "Display a title and subtitle to all players",
+  "parameters": {
+    "title": {
+      "type": "string",
+      "default": "Hello!"
+    },
+    "subtitle": {
+      "type": "string",
+      "default": ""
+    },
+    "target": {
+      "type": "selector",
+      "default": "@a"
+    }
+  },
+  "steps": [
+    {
+      "type": "title",
+      "target": "${target}",
+      "title": "${title}",
+      "subtitle": "${subtitle}",
+      "fadeInTicks": 10,
+      "stayTicks": 60,
+      "fadeOutTicks": 20
+    }
+  ]
+}

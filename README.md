@@ -16,6 +16,7 @@ through the current 26.x releases: shared HTTP, config and API code lives in
 ## Quick links
 
 - [API reference](docs/API.md)
+- [Functions](docs/FUNCTIONS.md) ([format](docs/FUNCTION_FORMAT.md), [API](docs/FUNCTION_API.md), [security](docs/FUNCTION_SECURITY.md), [examples](docs/FUNCTION_EXAMPLES.md))
 - [Native execution, async jobs, and Paper/Spigot](docs/NATIVE_EXECUTION.md)
 - [Build guide](docs/BUILD.md)
 - [Supported versions](docs/VERSIONS.md) (generated)
@@ -73,7 +74,7 @@ adapter families and per-column meanings.
 
 The prior CI column records a run on a historical commit in the
 `hernan-lc/commandclient` fork. It does not verify the current source or the
-1.4.0 release. See [docs/VERSIONS.md](docs/VERSIONS.md) for the recorded commit.
+1.5.0 release. See [docs/VERSIONS.md](docs/VERSIONS.md) for the recorded commit.
 
 ### Support policy
 
@@ -149,8 +150,12 @@ node docs/example.js --batch "hello" "/seed"
 | `/api/status` | GET | API state, Minecraft version, current player |
 | `/api/chat` | POST | Send chat message(s) as the local player |
 | `/api/execute` | POST | Alias of `/api/chat`, kept for compatibility |
+| `/api/functions` | GET | List reusable functions |
+| `/api/functions/{id}/run` | POST | Execute a function with validated arguments |
+| `/api/functions/{id}/preview` | POST | Preview resolved commands without executing |
 
 Full request/response formats, limits and status codes: [docs/API.md](docs/API.md).
+Reusable parameterized functions: [docs/FUNCTIONS.md](docs/FUNCTIONS.md); CLI: `node scripts/commandclient.js functions run <id> --count 5`.
 
 ## Configuration
 

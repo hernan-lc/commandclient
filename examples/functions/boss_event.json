@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "name": "boss_event",
+  "description": "Spawn a boss mob with dramatic announcement and delay",
+  "parameters": {
+    "mob": {
+      "type": "entity",
+      "default": "minecraft:ravager"
+    },
+    "title": {
+      "type": "string",
+      "default": "Boss Incoming!"
+    },
+    "subtitle": {
+      "type": "string",
+      "default": "Hold the line"
+    },
+    "delayTicks": {
+      "type": "integer",
+      "min": 0,
+      "max": 600,
+      "default": 40
+    }
+  },
+  "steps": [
+    {
+      "type": "title",
+      "target": "@a",
+      "title": "${title}",
+      "subtitle": "${subtitle}",
+      "fadeInTicks": 10,
+      "stayTicks": 60,
+      "fadeOutTicks": 20
+    },
+    {
+      "type": "sound",
+      "sound": "minecraft:entity.ender_dragon.growl",
+      "source": "master",
+      "target": "@a",
+      "volume": 1,
+      "pitch": 1
+    },
+    {
+      "type": "delay",
+      "ticks": "${delayTicks}"
+    },
+    {
+      "type": "summon",
+      "entity": "${mob}",
+      "position": "~ ~1 ~"
+    },
+    {
+      "type": "if",
+      "condition": {
+        "parameter": "delayTicks",
+        "operator": "gt",
+        "value": 100
+      },
+      "then": [
+        {
+          "type": "command",
+          "value": "say The ground trembles..."
+        }
+      ],
+      "else": [
+        {
+          "type": "command",
+          "value": "say The boss appears!"
+        }
+      ]
+    }
+  ]
+}

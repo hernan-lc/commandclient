@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "name": "spawn_zombie",
+  "description": "Spawn zombies near the caller",
+  "parameters": {
+    "mob": {
+      "type": "entity",
+      "default": "minecraft:zombie"
+    },
+    "count": {
+      "type": "integer",
+      "min": 1,
+      "max": 10,
+      "default": 1
+    },
+    "position": {
+      "type": "position",
+      "default": "~ ~1 ~"
+    }
+  },
+  "steps": [
+    {
+      "type": "repeat",
+      "times": "${count}",
+      "steps": [
+        {
+          "type": "summon",
+          "entity": "${mob}",
+          "position": "${position}"
+        }
+      ]
+    }
+  ]
+}

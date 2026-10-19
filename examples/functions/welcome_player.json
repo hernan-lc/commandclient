@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "name": "welcome_player",
+  "description": "Welcome a player with title, sound and particles",
+  "parameters": {
+    "player": {
+      "type": "player",
+      "default": "Steve"
+    },
+    "title": {
+      "type": "string",
+      "default": "Welcome!"
+    },
+    "subtitle": {
+      "type": "string",
+      "default": "Enjoy your stay"
+    }
+  },
+  "steps": [
+    {
+      "type": "title",
+      "target": "@a",
+      "title": "${title}",
+      "subtitle": "${subtitle}",
+      "fadeInTicks": 10,
+      "stayTicks": 60,
+      "fadeOutTicks": 20
+    },
+    {
+      "type": "sound",
+      "sound": "minecraft:entity.player.levelup",
+      "source": "master",
+      "target": "@a",
+      "volume": 1,
+      "pitch": 1
+    },
+    {
+      "type": "particle",
+      "particle": "minecraft:happy_villager",
+      "position": "~ ~1 ~",
+      "count": 20
+    }
+  ]
+}

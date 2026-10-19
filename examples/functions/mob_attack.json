@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "name": "mob_attack",
+  "description": "Spawn mobs and announce an attack",
+  "parameters": {
+    "mob": {
+      "type": "entity",
+      "default": "minecraft:zombie"
+    },
+    "count": {
+      "type": "integer",
+      "min": 1,
+      "max": 20,
+      "default": 1
+    },
+    "title": {
+      "type": "string",
+      "default": "Mob Attack!"
+    },
+    "subtitle": {
+      "type": "string",
+      "default": "Prepare yourself!"
+    }
+  },
+  "steps": [
+    {
+      "type": "repeat",
+      "times": "${count}",
+      "steps": [
+        {
+          "type": "summon",
+          "entity": "${mob}",
+          "position": "~ ~1 ~"
+        }
+      ]
+    },
+    {
+      "type": "title",
+      "target": "@a",
+      "title": "${title}",
+      "subtitle": "${subtitle}",
+      "fadeInTicks": 10,
+      "stayTicks": 60,
+      "fadeOutTicks": 20
+    },
+    {
+      "type": "sound",
+      "sound": "minecraft:entity.ender_dragon.growl",
+      "source": "master",
+      "target": "@a",
+      "volume": 1,
+      "pitch": 1
+    }
+  ]
+}

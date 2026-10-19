@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "name": "teleport_player",
+  "description": "Teleport a player to a position",
+  "parameters": {
+    "player": {
+      "type": "player",
+      "default": "Steve"
+    },
+    "destination": {
+      "type": "position",
+      "default": "~ ~ ~"
+    }
+  },
+  "steps": [
+    {
+      "type": "command",
+      "value": "tp ${player} ${destination}"
+    }
+  ]
+}

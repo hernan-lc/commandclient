@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "name": "gift_reward",
+  "description": "Give a reward item and announce it",
+  "parameters": {
+    "player": {
+      "type": "player",
+      "default": "Steve"
+    },
+    "item": {
+      "type": "resource_location",
+      "default": "minecraft:diamond"
+    },
+    "amount": {
+      "type": "integer",
+      "min": 1,
+      "max": 64,
+      "default": 1
+    }
+  },
+  "steps": [
+    {
+      "type": "command",
+      "value": "give ${player} ${item} ${amount}"
+    },
+    {
+      "type": "sound",
+      "sound": "minecraft:entity.player.levelup",
+      "source": "master",
+      "target": "@a",
+      "volume": 1,
+      "pitch": 1
+    }
+  ]
+}
