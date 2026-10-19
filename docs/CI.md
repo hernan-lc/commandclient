@@ -5,7 +5,7 @@
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `.github/workflows/build.yml` | push to `main`, PRs, manual | Shared tests, then one matrix job per Minecraft target, then aggregate verification |
-| `.github/workflows/release.yml` | tag `v*`, manual | Builds every target in one run and publishes the release |
+| `.github/workflows/release.yml` | tag `v*`/`V*`, published release, manual | Builds every target in one run and publishes the release |
 
 The build matrix is generated from `versions.json` by the `targets` job, so
 adding a Minecraft version adds a CI job automatically. Nothing about a version
@@ -27,6 +27,15 @@ shared                   ▼
 `aggregate` runs with `if: always()` on purpose: if a target fails, the job
 still runs and names the missing version instead of being skipped, so the
 failure report is specific.
+
+## Release workflow
+
+The release job resolves one tag (published release, manual input, or pushed
+tag), checks that the tag names `modVersion` before it spends minutes on a
+build, then checks that tag out so the published artifacts always come from
+the released commit. The `v` prefix of the tag may be upper or lower case;
+the version after it must equal `modVersion` exactly. See
+[releasing](RELEASING.md).
 
 ## Recorded CI evidence
 

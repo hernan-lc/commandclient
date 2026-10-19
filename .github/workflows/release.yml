@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+      - 'V*'
   release:
     types: [published]
   workflow_dispatch:
@@ -19,8 +20,16 @@ jobs:
   release:
     name: Build and publish every supported version
     runs-on: ubuntu-latest
+    # One place decides which tag is being released: a published release, a
+    # manual dispatch, or the tag that was pushed.
+    env:
+      TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Always build the tagged source. A manual dispatch must not publish
+          # artifacts built from the branch that happened to trigger it.
+          ref: ${{ env.TAG }}
 
       # Every JDK any target needs to build, taken from versions.json.
       - name: Collect required JDKs
@@ -48,18 +57,28 @@ jobs:
 
       # Checked before the ~3 minute build so a mistake surfaces in seconds.
       - name: Check the tag matches versions.json
+        env:
+          MOD_VERSION: ${{ steps.jdks.outputs.mod_version }}
         run: |
-          TAG="${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.tag || github.ref_name }}"
-          EXPECTED="v${{ steps.jdks.outputs.mod_version }}"
-          if [ "$TAG" != "$EXPECTED" ]; then
+          # What has to match is the version, because that is what names the
+          # JARs. The "v" prefix is cosmetic: v1.5.0 and V1.5.0 are the same
+          # release, so one leading prefix character is stripped before
+          # comparing.
+          case "$TAG" in
+            [vV]*) TAG_VERSION="${TAG:1}" ;;
+            *) TAG_VERSION="$TAG" ;;
+          esac
+          if [ "$TAG_VERSION" != "$MOD_VERSION" ]; then
             echo "::error title=Tag/version mismatch::tag $TAG does not match modVersion \
-          in versions.json (expected $EXPECTED). The JARs this build produces would be named \
-          ${{ steps.jdks.outputs.mod_version }}, not ${TAG#v}. To release ${TAG#v}: set modVersion \
-          to ${TAG#v} in versions.json, run ./gradlew buildAllVersions versionTable, commit, then \
-          move the $TAG tag onto that commit (git tag -f $TAG && git push -f origin $TAG)."
+          $MOD_VERSION in versions.json. This build produces JARs named \
+          commandapi-$MOD_VERSION+mc<version>.jar, so it can only publish release \
+          v$MOD_VERSION. Either move the release onto that tag (git tag -f v$MOD_VERSION \
+          <commit> && git push -f origin v$MOD_VERSION) or, if $TAG_VERSION is the version \
+          you want to release, set modVersion to $TAG_VERSION in versions.json, run \
+          ./gradlew buildAllVersions versionTable, commit, then tag that commit."
             exit 1
           fi
-          echo "tag $TAG matches modVersion ${{ steps.jdks.outputs.mod_version }}"
+          echo "tag $TAG matches modVersion $MOD_VERSION"
 
       # A release must not be published if any configured target fails, so this
       # builds them all in one run rather than a matrix.
@@ -79,12 +98,18 @@ jobs:
         run: python3 scripts/verify-plugin.py build/server-distributions/commandapi-server-*.jar
 
       - name: Build release notes
+        env:
+          MOD_VERSION: ${{ steps.jdks.outputs.mod_version }}
         run: |
-          TAG="${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.tag || github.ref_name }}"
           python3 scripts/generate-version-table.py
+          CANONICAL="v$MOD_VERSION"
           {
-            echo "## Command API $TAG"
+            echo "## Command API $CANONICAL"
             echo
+            if [ "$TAG" != "$CANONICAL" ]; then
+              echo "Released from tag \`$TAG\`; the canonical tag for $MOD_VERSION is \`$CANONICAL\`."
+              echo
+            fi
             echo "One JAR per supported Minecraft version. Drop the matching file into your \`mods/\` folder."
             echo "Fabric Loader is required; Fabric API is not."
             echo "Install ONE server JAR in plugins/: legacy for 1.16.5-1.20.6 (Java 8 bytecode), modern for 1.21-26.x (Java 21 bytecode). Use the Java required by your server. Folia is unsupported."
@@ -103,18 +128,19 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          MOD_VERSION: ${{ steps.jdks.outputs.mod_version }}
         run: |
-          TAG="${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.tag || github.ref_name }}"
           ASSETS=(build/distributions/*.jar build/distributions/manifest.json build/server-distributions/*.jar build/server-distributions/server-manifest.json)
+          TITLE="Command API v$MOD_VERSION"
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "release $TAG already exists; updating it in place"
             gh release upload "$TAG" "${ASSETS[@]}" --clobber
-            gh release edit "$TAG" --title "Command API $TAG" --notes-file release-notes.md
+            gh release edit "$TAG" --title "$TITLE" --notes-file release-notes.md
           else
             echo "creating release $TAG"
             gh release create "$TAG" \
-              --title "Command API $TAG" \
+              --title "$TITLE" \
               --notes-file release-notes.md \
               "${ASSETS[@]}"
           fi
